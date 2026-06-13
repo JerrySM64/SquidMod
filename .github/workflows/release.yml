@@ -33,7 +33,7 @@ jobs:
             mingw-w64-x86_64-rust
             mingw-w64-x86_64-nsis
             mingw-w64-x86_64-upx
-            mingw-w64-x86_64-7z
+            mingw-w64-x86_64-7zip
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
@@ -99,7 +99,7 @@ jobs:
             python3-setuptools \
             patchelf \
             desktop-file-utils \
-            libgdk-pixbuf2.0-dev \
+            libgdk-pixbuf-2.0-dev \
             squashfs-tools
 
       - name: Install Rust toolchain
