@@ -34,7 +34,6 @@ jobs:
             mingw-w64-x86_64-pkg-config
             mingw-w64-x86_64-rust
             mingw-w64-x86_64-nsis
-            mingw-w64-x86_64-upx
             mingw-w64-x86_64-7zip
 
       - name: Cache Cargo registry
@@ -49,9 +48,6 @@ jobs:
 
       - name: Build
         run: cargo build --release
-
-      - name: Compress binary
-        run: upx --best --lzma target/release/SquidMod.exe
 
       - name: Create portable ZIP
         run: |
@@ -96,7 +92,6 @@ jobs:
             libglib2.0-dev \
             libssl-dev \
             libfuse2 \
-            upx-ucl \
             squashfs-tools
 
       - name: Install Rust toolchain
@@ -114,9 +109,6 @@ jobs:
 
       - name: Build
         run: cargo build --release
-
-      - name: Compress binary
-        run: upx --best --lzma target/release/SquidMod
 
       - name: Build AppImage
         run: |
