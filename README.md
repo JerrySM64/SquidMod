@@ -20,7 +20,6 @@ SquidMod is a cross-platform modding tool for Splatoon. It works with Cemu, Xapf
 |----------|--------|
 | Windows | Supported |
 | Linux (glibc) | Supported |
-| Linux (musl) | Supported |
 | macOS | Supported |
 
 ## Building from Source
