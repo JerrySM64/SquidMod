@@ -95,11 +95,6 @@ jobs:
             libssl-dev \
             libfuse2 \
             upx-ucl \
-            python3-pip \
-            python3-setuptools \
-            patchelf \
-            desktop-file-utils \
-            libgdk-pixbuf-2.0-dev \
             squashfs-tools
 
       - name: Install Rust toolchain
@@ -121,92 +116,29 @@ jobs:
       - name: Compress binary
         run: upx --best --lzma target/release/SquidMod
 
-      - name: Install appimage-builder
-        run: |
-          pip3 install appimage-builder
-
-      - name: Prepare AppDir
-        run: |
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp target/release/SquidMod AppDir/usr/bin/squidmod
-          chmod +x AppDir/usr/bin/squidmod
-          cp assets/hicolor/256x256/apps/dev.jerrysm64.squidmod.png \
-             AppDir/usr/share/icons/hicolor/256x256/apps/squidmod.png
-          cat > AppDir/usr/share/applications/squidmod.desktop << 'EOF'
-          [Desktop Entry]
-          Type=Application
-          Name=SquidMod
-          Exec=squidmod
-          Icon=squidmod
-          Categories=Utility;
-          Terminal=false
-          EOF
-
-      - name: Generate AppImageBuilder.yml
-        run: |
-          cat > AppImageBuilder.yml << 'EOF'
-          version: 1
-          script:
-            - rm -rf ./AppDir 2>/dev/null || true
-
-          AppDir:
-            path: ./AppDir
-
-            app_info:
-              id: dev.jerrysm64.squidmod
-              name: SquidMod
-              icon: squidmod
-              version: latest
-              exec: usr/bin/squidmod
-
-            apt:
-              arch: amd64
-              sources:
-                - sourceline: deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
-                - sourceline: deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
-                - sourceline: deb http://security.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
-
-              include:
-                - libgtk-4-1
-                - libadwaita-1-0
-                - libglib2.0-0
-                - libgdk-pixbuf-2.0-0
-                - libpango-1.0-0
-                - libpangocairo-1.0-0
-                - libcairo2
-                - libcairo-gobject2
-                - libgraphene-1.0-0
-                - libepoxy0
-                - libharfbuzz0b
-                - libfribidi0
-                - libssl3
-                - libc6
-                - libstdc++6
-                - libgcc-s1
-                - zlib1g
-
-              exclude:
-                - dpkg
-
-            runtime:
-              env:
-                APPDIR_LIBRARY_PATH: $APPDIR/lib/x86_64-linux-gnu:$APPDIR/usr/lib/x86_64-linux-gnu
-                GDK_BACKEND: x11,wayland
-                GTK_THEME: Adwaita
-              patch_elf: true
-
-          AppImage:
-            arch: x86_64
-            update-information: None
-            sign-key: None
-            file_name: SquidMod-${{ github.ref_name }}-x86_64.AppImage
-          EOF
-
       - name: Build AppImage
         run: |
-          appimage-builder --recipe AppImageBuilder.yml --skip-test
+          APPDIR=AppDir
+          mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" \
+            "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+
+          cp target/release/SquidMod "$APPDIR/usr/bin/squidmod"
+          chmod +x "$APPDIR/usr/bin/squidmod"
+
+          printf '[Desktop Entry]\nType=Application\nName=SquidMod\nExec=squidmod\nIcon=squidmod\nCategories=Utility;\nTerminal=false\n' > "$APPDIR/usr/share/applications/SquidMod.desktop"
+          cp "$APPDIR/usr/share/applications/SquidMod.desktop" "$APPDIR/SquidMod.desktop"
+
+          printf '#!/bin/sh\nexec "$(dirname "$0")/usr/bin/squidmod" "$@"\n' > "$APPDIR/AppRun"
+          chmod +x "$APPDIR/AppRun"
+
+          cp assets/hicolor/256x256/apps/dev.jerrysm64.squidmod.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/squidmod.png"
+          cp "$APPDIR/usr/share/icons/hicolor/256x256/apps/squidmod.png" "$APPDIR/squidmod.png"
+          ln -s squidmod.png "$APPDIR/.DirIcon"
+
+          curl -L -o appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool.AppImage
+          ./appimagetool.AppImage --appimage-extract
+          ARCH=x86_64 ./squashfs-root/AppRun "$APPDIR" SquidMod-${{ github.ref_name }}-x86_64.AppImage
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
