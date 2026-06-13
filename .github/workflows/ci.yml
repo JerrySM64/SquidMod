@@ -45,6 +45,7 @@ jobs:
   build-linux-glibc:
     name: Build Linux (glibc)
     runs-on: ubuntu-latest
+    container: debian:13
 
     steps:
       - name: Checkout
@@ -52,8 +53,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get update
+          apt-get install -y --no-install-recommends \
             build-essential ca-certificates curl file git pkg-config \
             libssl-dev libgtk-4-dev libadwaita-1-dev
 
@@ -86,8 +87,15 @@ jobs:
         run: |
           apk add --no-cache \
             build-base curl bash git pkgconfig \
-            gtk4.0-dev libadwaita-dev openssl-dev \
-            rust cargo
+            gtk4.0-dev libadwaita-dev openssl-dev
+
+      - name: Install Rust
+        run: |
+          curl -o rustup-init https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-musl/rustup-init
+          chmod +x rustup-init
+          ./rustup-init -y --default-host x86_64-unknown-linux-musl --profile minimal
+          rm rustup-init
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
