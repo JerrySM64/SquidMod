@@ -149,7 +149,7 @@ jobs:
           cat > AppImageBuilder.yml << 'EOF'
           version: 1
           script:
-            - rm -rf "${{APPDIR}}" 2>/dev/null || true
+            - rm -rf ./AppDir 2>/dev/null || true
 
           AppDir:
             path: ./AppDir
