@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -61,7 +63,7 @@ jobs:
       - name: Build NSIS installer
         run: |
           cp assets/icon.ico pkg/icon.ico 2>/dev/null || true
-          makensis /DVERSION=${{ github.ref_name }} /DOUTFILE=SquidMod-${{ github.ref_name }}-x64.exe SquidModInstaller.nsi
+          makensis //DVERSION=${{ github.ref_name }} //DOUTFILE=SquidMod-${{ github.ref_name }}-x64.exe SquidModInstaller.nsi
 
       - name: Upload portable ZIP
         uses: actions/upload-artifact@v4
