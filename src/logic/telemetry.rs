@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -7,7 +6,7 @@ use sha1::{Digest, Sha1};
 use crate::gui::{ConnectionMode, EngineState, NetworkMode};
 use crate::platform::ProcessMemory;
 
-const TELEMETRY_URL: &str = "http://splatpost.spbr.net/post";
+const TELEMETRY_URL: &str = "https://splatpost.spbr.net/post";
 const MATCH_ACTIVE_ADDR: u64 = 0x101E4FF8;
 const PAYLOAD_PTR_ADDR: u64 = 0x101DCDB0;
 const PAYLOAD_OFFSET: u64 = 0x150;
@@ -100,8 +99,8 @@ fn tick(pm: &ProcessMemory, telemetry_state: &Arc<Mutex<TelemetryState>>) -> any
         return Ok(());
     }
 
-    let start_network_time: u32 = match fields.get("StartNetworkTime") {
-        Some(val) => val.parse().unwrap_or(0),
+    let start_network_time: u32 = match fields.iter().find(|(k, _)| k.as_str() == "StartNetworkTime") {
+        Some((_, val)) => val.parse().unwrap_or(0),
         None => return Ok(()),
     };
 
@@ -117,11 +116,9 @@ fn tick(pm: &ProcessMemory, telemetry_state: &Arc<Mutex<TelemetryState>>) -> any
         ts_guard.last_start_network_time = start_network_time;
     }
 
-    let total_available = PAYLOAD_SIZE.saturating_sub(pattern_offset);
-    let faceimg_size = FACEIMG_SIZE.min(total_available);
-    let faceimg_data = pm.read_bytes(resolved_addr + pattern_offset as u64, faceimg_size)?;
+    let faceimg_data = pm.read_bytes(resolved_addr + pattern_offset as u64, FACEIMG_SIZE)?;
 
-    fields.insert("ServerEnv".to_string(), "L1".to_string());
+    upsert_field(&mut fields, "ServerEnv", "L1".to_string());
 
     let boundary = generate_boundary();
     let body = build_multipart_body(&fields, &faceimg_data, &boundary);
@@ -130,7 +127,6 @@ fn tick(pm: &ProcessMemory, telemetry_state: &Arc<Mutex<TelemetryState>>) -> any
     let sha1_hex = compute_sha1_hex(&body);
 
     let client = reqwest::blocking::Client::builder()
-        .user_agent("Mozilla/5.0")
         .build()?;
 
     let response = client
@@ -156,8 +152,8 @@ fn tick(pm: &ProcessMemory, telemetry_state: &Arc<Mutex<TelemetryState>>) -> any
     Ok(())
 }
 
-fn parse_telemetry_payload(raw: &[u8]) -> HashMap<String, String> {
-    let mut result = HashMap::new();
+fn parse_telemetry_payload(raw: &[u8]) -> Vec<(String, String)> {
+    let mut result = Vec::new();
 
     let actual_start = match raw.iter().position(|&b| b == 0x2D) {
         Some(pos) => pos,
@@ -176,39 +172,29 @@ fn parse_telemetry_payload(raw: &[u8]) -> HashMap<String, String> {
         return result;
     }
 
-    let boundary = boundary_line.trim_start_matches('-').to_string();
-    if boundary.is_empty() {
-        return result;
-    }
-
-    let delimiter = format!("--{}", boundary);
-    let parts: Vec<&str> = content.split(&delimiter).collect();
+    let parts: Vec<&str> = content.split(boundary_line.as_str()).collect();
 
     for part in parts {
         let trimmed = part.trim();
-        if trimmed.is_empty() || trimmed == "--" {
+        if trimmed.is_empty()
+            || trimmed == "--"
+            || !part.contains("Content-Disposition")
+            || part.contains("name=\"FaceImg\"")
+        {
             continue;
         }
 
-        if !trimmed.contains("Content-Disposition") {
-            continue;
-        }
-
-        if trimmed.contains("name=\"FaceImg\"") {
-            continue;
-        }
-
-        let name = match extract_field_name_from_part(trimmed) {
+        let name = match extract_field_name_from_part(part) {
             Some(n) => n,
             None => continue,
         };
 
-        let value = match extract_field_value_from_part(trimmed) {
+        let value = match extract_field_value_from_part(part) {
             Some(v) => v,
             None => continue,
         };
 
-        result.insert(name, value);
+        upsert_field(&mut result, &name, value);
     }
 
     result
@@ -219,30 +205,35 @@ fn extract_field_name_from_part(part: &str) -> Option<String> {
     let name_start = part.find(name_marker)?;
     let after_marker = &part[name_start + name_marker.len()..];
     let end_quote = after_marker.find('"')?;
+    if end_quote == 0 {
+        return None;
+    }
     Some(after_marker[..end_quote].to_string())
 }
 
 fn extract_field_value_from_part(part: &str) -> Option<String> {
-    let value_start = match part.find("\r\n\r\n") {
-        Some(pos) => pos + 4,
+    let (value_start, offset) = match part.find("\r\n\r\n") {
+        Some(pos) => (pos, 4),
         None => match part.find("\n\n") {
-            Some(pos) => pos + 2,
+            Some(pos) => (pos, 2),
             None => return None,
         },
     };
 
-    let value = &part[value_start..];
-    let value = value.trim_matches(|c: char| c == '\r' || c == '\n' || c == '-' || c == ' ');
+    let value = &part[value_start + offset..];
+    Some(value.trim_matches(['\r', '\n', '-', ' ']).to_string())
+}
 
-    if value.is_empty() {
-        None
+fn upsert_field(fields: &mut Vec<(String, String)>, key: &str, value: String) {
+    if let Some(slot) = fields.iter_mut().find(|(k, _)| k.as_str() == key) {
+        slot.1 = value;
     } else {
-        Some(value.to_string())
+        fields.push((key.to_string(), value));
     }
 }
 
 fn build_multipart_body(
-    fields: &HashMap<String, String>,
+    fields: &[(String, String)],
     faceimg: &[u8],
     boundary: &str,
 ) -> Vec<u8> {

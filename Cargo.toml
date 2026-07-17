@@ -1,6 +1,6 @@
 [package]
 name = "squidmod"
-version = "8.0.0"
+version = "8.0.1"
 edition = "2024"
 description = "Modding Tool for Splatoon on Cemu/Xapfish"
 build = "build.rs"

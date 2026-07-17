@@ -3006,7 +3006,7 @@ dependencies = [
 
 [[package]]
 name = "squidmod"
-version = "8.0.0"
+version = "8.0.1"
 dependencies = [
  "anyhow",
  "cfg-if",

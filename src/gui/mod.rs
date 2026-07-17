@@ -26,7 +26,6 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-
 pub struct AppState {
     pub connection_mode: ConnectionMode,
     pub wiiu_ip: String,
@@ -422,7 +421,9 @@ fn build_ui(app: &adw::Application) {
                 .version(env!("CARGO_PKG_VERSION"))
                 .website("https://github.com/JerrySM64/SquidMod")
                 .license_type(gtk::License::MitX11)
-                .release_notes("<p>SquidMod goes open source!</p>")
+                .release_notes(
+                    "<p>Fixed a bug where the Spacebar telemetry failed with a server error.</p>",
+                )
                 .build();
             about.add_link("Donate", "https://ko-fi.com/jerrysm64");
             about.present(Some(&window));
