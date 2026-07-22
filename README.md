@@ -7,7 +7,7 @@ SquidMod is a cross-platform modding tool for Splatoon. It works with Cemu, Xapf
 - **Memory Editing**: Read and write process memory for real-time game modifications.
 - **Wii U Support**: Connect to a real Wii U console via TCPGecko for memory editing.
 - **Player Information**: Display player details including name, PID, and gear information.
-- **Match Information**: Display current match details including player and team data.
+- **Match Information**: Display Players and Session ID.
 - **Scene Information**: Show current game scene state.
 - **Memory Viewer**: Inspect memory at specific addresses.
 - **Plugin System**: Extend functionality with plugins.
