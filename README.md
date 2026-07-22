@@ -14,20 +14,12 @@ SquidMod is a cross-platform modding tool for Splatoon. It works with Cemu, Xapf
 - **Network Support**: Compatible with Pretendo and Spacebar.
 - **Cross-Platform**: Native support for Windows, Linux, and macOS.
 
-## Supported Platforms
-
-| Platform | Status |
-|----------|--------|
-| Windows | Supported |
-| Linux (glibc) | Supported |
-| macOS | Supported |
-
 ## Building from Source
 
 ### Prerequisites
 
-- **Rust** (latest stable toolchain)
-- **GTK 4** and **libadwaita**
+- **Rust Toolchain**
+- **GTK4** and **libadwaita**
 - **pkg-config**
 
 ### Platform-Specific Requirements
@@ -47,7 +39,7 @@ cargo build --release
 For platform-specific release builds, use the provided Makefile:
 
 ```bash
-# Linux AppImage (glibc)
+# Linux AppImage
 make linux-release
 
 # Windows ZIP
