@@ -5,13 +5,16 @@ pub mod player_info;
 pub mod plugin_manager;
 pub mod scene_info;
 pub mod utilities;
+pub mod utf_util;
 
 use crate::logic::config::{AppConfig, load_config, save_config};
 pub use crate::logic::config::{ConnectionMode, NetworkMode};
 use crate::logic::matchinfo::MatchRecord;
 use crate::logic::playerinfo::PlayerRecord;
 use crate::logic::sceneinfo::SceneRecord;
+/* TODO: Wait for SPFN to implement telemetry
 use crate::logic::telemetry;
+*/
 use crate::*;
 use adw::prelude::*;
 use anyhow::Result;
@@ -49,6 +52,12 @@ pub struct AppState {
 
     pub tab_table: HashMap<u32, TabEntry>,
     pub group_table: HashMap<u32, GroupEntry>,
+}
+
+// Remove this as soon as SPFN has SplatNet implemented
+pub struct SharedConfig {
+    pub connection_mode: ConnectionMode,
+    pub network_mode: NetworkMode,
 }
 
 pub struct EngineState {
@@ -346,12 +355,19 @@ fn build_ui(app: &adw::Application) {
     });
 
     setup_main_loop(&state, global_rx);
-
+    
+    let shared_config = Arc::new(Mutex::new(SharedConfig {
+        connection_mode: cfg.connection_mode,
+        network_mode: cfg.network_mode,
+    }));
+    
+    /* TODO: Wait for SPFN to implement SplatNet
     let shared_config = Arc::new(Mutex::new(telemetry::SharedConfig {
         connection_mode: cfg.connection_mode,
         network_mode: cfg.network_mode,
     }));
     telemetry::spawn_telemetry_loop(engine_state.clone(), shared_config.clone());
+    */
 
     let state_clone = state.clone();
     let status_label_clone = status_label.clone();
@@ -920,12 +936,18 @@ fn show_settings_window(
     connect_btn: &gtk::Button,
     status_label: &gtk::Label,
     ip_entry: &gtk::Entry,
+    shared_config: &Arc<Mutex<SharedConfig>>,
+    /* TODO: Wait for SPFN to implement SplatNet
     shared_config: &Arc<Mutex<telemetry::SharedConfig>>,
+    */
 ) {
     let window = adw::PreferencesDialog::builder().title("Settings").build();
 
     let page = adw::PreferencesPage::new();
-    let group = adw::PreferencesGroup::builder().title("Connection").build();
+    let group = adw::PreferencesGroup::builder()
+        .title("Connection")
+        .description("Wii U Connection is experimental. Expect crashes!")
+        .build();
 
     let action_row = adw::ActionRow::builder()
         .title("Target Platform")
@@ -1004,26 +1026,26 @@ fn show_settings_window(
     net_box.set_valign(gtk::Align::Center);
 
     let pretendo_btn = gtk::ToggleButton::builder().label("Pretendo").build();
-    let spacebar_btn = gtk::ToggleButton::builder().label("Spacebar").build();
-    spacebar_btn.set_group(Some(&pretendo_btn));
+    let spfn_btn = gtk::ToggleButton::builder().label("SPFN").build();
+    spfn_btn.set_group(Some(&pretendo_btn));
 
     net_box.append(&pretendo_btn);
-    net_box.append(&spacebar_btn);
+    net_box.append(&spfn_btn);
     network_row.add_suffix(&net_box);
 
     let initial_network = state.borrow().network_mode;
-    if initial_network == NetworkMode::Spacebar {
-        spacebar_btn.set_active(true);
+    if initial_network == NetworkMode::SPFN {
+        spfn_btn.set_active(true);
     } else {
         pretendo_btn.set_active(true);
     }
 
     let state_clone_net = state.clone();
     let shared_config_clone_net = shared_config.clone();
-    spacebar_btn.connect_toggled(move |btn| {
+    spfn_btn.connect_toggled(move |btn| {
         let mut sf = state_clone_net.borrow_mut();
         sf.network_mode = if btn.is_active() {
-            NetworkMode::Spacebar
+            NetworkMode::SPFN
         } else {
             NetworkMode::Pretendo
         };

@@ -13,7 +13,7 @@ pub fn get_player_report(p: &PlayerRecord, state: &AppState) -> String {
     report.push_str(&format!("Name: {}\n", p.name));
     report.push_str(&format!("PID Hex: {}\n", p.pid_hex));
     report.push_str(&format!("PID Dec: {}\n", p.pid_dec));
-    let id_label = if state.network_mode == NetworkMode::Spacebar {
+    let id_label = if state.network_mode == NetworkMode::SPFN {
         "SFID"
     } else {
         "PNID"
@@ -93,7 +93,7 @@ pub fn show_player_properties(
     add_row(&general_group, "Name", player.name.clone());
     add_row(&general_group, "PID (Hex)", player.pid_hex.clone());
     add_row(&general_group, "PID (Dec)", player.pid_dec.to_string());
-    let id_label = if network_mode == NetworkMode::Spacebar {
+    let id_label = if network_mode == NetworkMode::SPFN {
         "SFID"
     } else {
         "PNID"
@@ -349,7 +349,7 @@ pub fn create_player_info_page(state: &Rc<RefCell<AppState>>) -> adw::Preference
 
             if let Some(player) = state_ref.players.iter().find(|p| p.index == i as u8) {
                 player_row_clone.set_title(&player.name);
-                let id_label = if state_ref.network_mode == NetworkMode::Spacebar {
+                let id_label = if state_ref.network_mode == NetworkMode::SPFN {
                     "SFID"
                 } else {
                     "PNID"

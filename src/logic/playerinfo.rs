@@ -119,7 +119,7 @@ fn get_pnid(pid: i32, network_mode: NetworkMode) -> String {
                 .unwrap_or("0")
                 .to_string()
         }
-        NetworkMode::Spacebar => {
+        NetworkMode::SPFN => {
             let url = format!(
                 "https://account.spfn.net/v1/api/admin/mapped_ids?input_type=pid&output_type=user_id&input={}",
                 pid
