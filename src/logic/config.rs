@@ -12,7 +12,7 @@ pub enum ConnectionMode {
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum NetworkMode {
     Pretendo,
-    SPFN,
+    Altendo,
 }
 
 #[derive(Serialize, Deserialize)]
