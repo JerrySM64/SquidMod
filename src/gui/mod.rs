@@ -47,6 +47,7 @@ pub struct AppState {
     pub ui_sender: std::sync::mpsc::Sender<crate::plugin::ffi::UiCommand>,
     pub global_tx: std::sync::mpsc::Sender<crate::plugin::PluginEvent>,
     pub network_mode: NetworkMode,
+    pub check_for_updates: bool,
 
     pub tab_table: HashMap<u32, TabEntry>,
     pub group_table: HashMap<u32, GroupEntry>,
@@ -116,6 +117,7 @@ fn build_ui(app: &adw::Application) {
         ui_sender: ui_tx,
         global_tx,
         network_mode: cfg.network_mode,
+        check_for_updates: cfg.check_for_updates,
         tab_table: HashMap::new(),
         group_table: HashMap::new(),
     }));
@@ -536,6 +538,38 @@ fn build_ui(app: &adw::Application) {
     window.set_content(Some(&split_view));
     window.set_icon_name(Some("dev.jerrysm64.squidmod"));
     window.present();
+
+    let check_updates_enabled = state.borrow().check_for_updates;
+    if check_updates_enabled {
+        std::thread::spawn(move || {
+            if let Some(status) = crate::logic::update::check_for_updates() {
+                if status.update_available {
+                    glib::idle_add(move || {
+                        let dialog = adw::AlertDialog::builder()
+                            .heading("Update Available")
+                            .body(format!(
+                                "SquidMod {} is available (running {})",
+                                status.latest_tag, status.current_version
+                            ))
+                            .build();
+                        dialog.add_response("cancel", "Not now");
+                        dialog.add_response("update", "Update");
+                        dialog.set_response_appearance("update", adw::ResponseAppearance::Suggested);
+                        dialog.connect_response(None, move |_, response| {
+                            if response == "update" {
+                                let _ = gtk::gio::AppInfo::launch_default_for_uri(
+                                    "https://github.com/JerrySM64/SquidMod/releases",
+                                    None::<&gio::AppLaunchContext>,
+                                );
+                            }
+                        });
+                        dialog.present(None::<&gtk::Window>);
+                        glib::ControlFlow::Break
+                    });
+                }
+            }
+        });
+    }
 
     setup_ui_event_loop(&state, ui_rx);
 }
@@ -974,6 +1008,7 @@ fn show_settings_window(
         save_config(&AppConfig {
             connection_mode: sf.connection_mode,
             network_mode: sf.network_mode,
+            check_for_updates: sf.check_for_updates,
         });
 
         if let Ok(mut sc) = shared_config_clone.lock() {
@@ -995,8 +1030,6 @@ fn show_settings_window(
     });
 
     group.add(&action_row);
-
-    let network_group = adw::PreferencesGroup::builder().title("Network").build();
 
     let network_row = adw::ActionRow::builder()
         .title("PID Lookup Network")
@@ -1034,6 +1067,7 @@ fn show_settings_window(
         save_config(&AppConfig {
             connection_mode: sf.connection_mode,
             network_mode: sf.network_mode,
+            check_for_updates: sf.check_for_updates,
         });
 
         if let Ok(mut sc) = shared_config_clone_net.lock() {
@@ -1041,9 +1075,38 @@ fn show_settings_window(
         }
     });
 
-    network_group.add(&network_row);
+    group.add(&network_row);
+
+    let updates_row = adw::ActionRow::builder()
+        .title("Check for updates")
+        .subtitle("Notify when a new release is available")
+        .build();
+
+    let updates_switch = gtk::Switch::builder()
+        .valign(gtk::Align::Center)
+        .active(state.borrow().check_for_updates)
+        .build();
+
+    let state_clone_updates = state.clone();
+    updates_switch.connect_active_notify(move |sw| {
+        let mut sf = state_clone_updates.borrow_mut();
+        sf.check_for_updates = sw.is_active();
+        save_config(&AppConfig {
+            connection_mode: sf.connection_mode,
+            network_mode: sf.network_mode,
+            check_for_updates: sf.check_for_updates,
+        });
+    });
+
+    updates_row.add_suffix(&updates_switch);
+    updates_row.set_activatable_widget(Some(&updates_switch));
+
+    let updates_group = adw::PreferencesGroup::new();
+
+    updates_group.add(&updates_row);
+
+    page.add(&updates_group);
     page.add(&group);
-    page.add(&network_group);
     window.add(&page);
 
     window.present(parent);
