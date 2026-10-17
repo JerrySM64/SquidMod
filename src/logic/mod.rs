@@ -1,8 +1,12 @@
 pub mod asmutil;
 pub mod config;
+pub mod connection;
 pub mod matchinfo;
 pub mod playerinfo;
+pub mod plugin_loop;
 pub mod sceneinfo;
+pub mod settings;
+pub mod state;
 pub mod telemetry;
 pub mod update;
 pub mod utilities;
