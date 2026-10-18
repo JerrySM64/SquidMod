@@ -6,7 +6,7 @@ use sha1::{Digest, Sha1};
 use crate::gui::{ConnectionMode, EngineState, NetworkMode};
 use crate::platform::ProcessMemory;
 
-const TELEMETRY_URL: &str = "https://splatpost.spbr.net/post";
+const TELEMETRY_URL: &str = "https://splatnet.altendo.cc/post";
 const MATCH_ACTIVE_ADDR: u64 = 0x101E4FF8;
 const PAYLOAD_PTR_ADDR: u64 = 0x101DCDB0;
 const PAYLOAD_OFFSET: u64 = 0x150;
@@ -45,7 +45,7 @@ pub fn spawn_telemetry_loop(
             };
 
             if config.connection_mode != ConnectionMode::Cemu
-                || config.network_mode != NetworkMode::Spacebar
+                || config.network_mode != NetworkMode::Altendo
             {
                 drop(config);
                 continue;

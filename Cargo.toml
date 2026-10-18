@@ -1,6 +1,6 @@
 [package]
 name = "squidmod"
-version = "8.0.1"
+version = "9.0.0"
 edition = "2024"
 description = "Modding Tool for Splatoon on Cemu/Xapfish"
 build = "build.rs"
@@ -18,7 +18,7 @@ gtk4 = { version = "0.11", features = ["v4_18"] }
 libadwaita = { version = "0.9", features = ["v1_7"] }
 libc = "0.2"
 cfg-if = "1.0"
-reqwest = { version = "0.13", features = ["blocking"] }
+reqwest = { version = "0.13", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }

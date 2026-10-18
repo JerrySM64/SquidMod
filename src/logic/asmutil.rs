@@ -1,6 +1,16 @@
+use std::collections::{BTreeSet, HashMap, HashSet};
+
 fn sign_extend(val: u32, bits: u32) -> i32 {
     let shift = 32 - bits;
     ((val << shift) as i32) >> shift
+}
+
+fn hex_imm(val: i32) -> String {
+    if val < 0 {
+        format!("-0x{:x}", -(val as i64))
+    } else {
+        format!("0x{:x}", val)
+    }
 }
 
 fn spr_name(spr: u32) -> Option<&'static str> {
@@ -28,7 +38,7 @@ fn cr_cond(bo: u32, bi_field: u32) -> Option<&'static str> {
     }
 }
 
-pub fn disassemble_instruction(word: u32) -> String {
+pub fn disassemble_instruction(word: u32, current_addr: u32) -> String {
     let opcode = (word >> 26) & 0x3F;
     match opcode {
         14 => dis_addi(word),
@@ -70,10 +80,10 @@ pub fn disassemble_instruction(word: u32) -> String {
         53 => dis_load_store_imm(word, "stfsu"),
         54 => dis_load_store_imm(word, "stfd"),
         55 => dis_load_store_imm(word, "stfdu"),
-        18 => dis_branch(word),
-        16 => dis_bc(word),
+        18 => dis_branch(word, current_addr),
+        16 => dis_bc(word, current_addr),
         31 => dis_opcode31(word),
-        19 => dis_opcode19(word),
+        19 => dis_opcode19(word, current_addr),
         59 => dis_opcode59(word),
         63 => dis_opcode63(word),
         17 => { if (word >> 1) & 1 == 1 { "sc".to_string() } else { format!(".long 0x{:08X}", word) } },
@@ -85,87 +95,87 @@ fn dis_addi(w: u32) -> String {
     let rd = (w >> 21) & 0x1F;
     let ra = (w >> 16) & 0x1F;
     let imm = sign_extend(w & 0xFFFF, 16);
-    if ra == 0 { format!("li r{},{}", rd, imm) }
-    else if imm < 0 { format!("subi r{},r{},{}", rd, ra, -imm) }
-    else { format!("addi r{},r{},{}", rd, ra, imm) }
+    if ra == 0 { format!("li r{},{}", rd, hex_imm(imm)) }
+    else if imm < 0 { format!("subi r{},r{},{}", rd, ra, hex_imm(-imm)) }
+    else { format!("addi r{},r{},{}", rd, ra, hex_imm(imm)) }
 }
 
 fn dis_addis(w: u32) -> String {
     let rd = (w >> 21) & 0x1F;
     let ra = (w >> 16) & 0x1F;
     let imm = sign_extend(w & 0xFFFF, 16);
-    if ra == 0 { format!("lis r{},{}", rd, imm) }
-    else { format!("addis r{},r{},{}", rd, ra, imm) }
+    if ra == 0 { format!("lis r{},{}", rd, hex_imm(imm)) }
+    else { format!("addis r{},r{},{}", rd, ra, hex_imm(imm)) }
 }
 
 fn dis_addic(w: u32) -> String {
     let rd = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F;
     let imm = sign_extend(w & 0xFFFF, 16);
-    format!("addic r{},r{},{}", rd, ra, imm)
+    format!("addic r{},r{},{}", rd, ra, hex_imm(imm))
 }
 
 fn dis_addic_dot(w: u32) -> String {
     let rd = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F;
     let imm = sign_extend(w & 0xFFFF, 16);
-    format!("addic. r{},r{},{}", rd, ra, imm)
+    format!("addic. r{},r{},{}", rd, ra, hex_imm(imm))
 }
 
 fn dis_mulli(w: u32) -> String {
     let rd = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F;
     let imm = sign_extend(w & 0xFFFF, 16);
-    format!("mulli r{},r{},{}", rd, ra, imm)
+    format!("mulli r{},r{},{}", rd, ra, hex_imm(imm))
 }
 
 fn dis_subfic(w: u32) -> String {
     let rd = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F;
     let imm = sign_extend(w & 0xFFFF, 16);
-    format!("subfic r{},r{},{}", rd, ra, imm)
+    format!("subfic r{},r{},{}", rd, ra, hex_imm(imm))
 }
 
 fn dis_cmpi(w: u32) -> String {
     let bf = (w >> 23) & 0x7; let ra = (w >> 16) & 0x1F;
     let imm = sign_extend(w & 0xFFFF, 16);
-    if bf == 0 { format!("cmpwi r{},{}", ra, imm) }
-    else { format!("cmpwi cr{},r{},{}", bf, ra, imm) }
+    if bf == 0 { format!("cmpwi r{},{}", ra, hex_imm(imm)) }
+    else { format!("cmpwi cr{},r{},{}", bf, ra, hex_imm(imm)) }
 }
 
 fn dis_cmpli(w: u32) -> String {
     let bf = (w >> 23) & 0x7; let ra = (w >> 16) & 0x1F;
     let imm = w & 0xFFFF;
-    if bf == 0 { format!("cmplwi r{},{}", ra, imm) }
-    else { format!("cmplwi cr{},r{},{}", bf, ra, imm) }
+    if bf == 0 { format!("cmplwi r{},0x{:x}", ra, imm) }
+    else { format!("cmplwi cr{},r{},0x{:x}", bf, ra, imm) }
 }
 
 fn dis_ori(w: u32) -> String {
     let rs = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F; let imm = w & 0xFFFF;
     if rs == 0 && ra == 0 && imm == 0 { "nop".to_string() }
     else if imm == 0 { format!("mr r{},r{}", ra, rs) }
-    else { format!("ori r{},r{},{}", ra, rs, imm) }
+    else { format!("ori r{},r{},0x{:x}", ra, rs, imm) }
 }
 
 fn dis_oris(w: u32) -> String {
     let rs = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F; let imm = w & 0xFFFF;
-    format!("oris r{},r{},{}", ra, rs, imm)
+    format!("oris r{},r{},0x{:x}", ra, rs, imm)
 }
 
 fn dis_xori(w: u32) -> String {
     let rs = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F; let imm = w & 0xFFFF;
-    format!("xori r{},r{},{}", ra, rs, imm)
+    format!("xori r{},r{},0x{:x}", ra, rs, imm)
 }
 
 fn dis_xoris(w: u32) -> String {
     let rs = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F; let imm = w & 0xFFFF;
-    format!("xoris r{},r{},{}", ra, rs, imm)
+    format!("xoris r{},r{},0x{:x}", ra, rs, imm)
 }
 
 fn dis_andi_dot(w: u32) -> String {
     let rs = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F; let imm = w & 0xFFFF;
-    format!("andi. r{},r{},{}", ra, rs, imm)
+    format!("andi. r{},r{},0x{:x}", ra, rs, imm)
 }
 
 fn dis_andis_dot(w: u32) -> String {
     let rs = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F; let imm = w & 0xFFFF;
-    format!("andis. r{},r{},{}", ra, rs, imm)
+    format!("andis. r{},r{},0x{:x}", ra, rs, imm)
 }
 
 fn dis_rlwinm(w: u32) -> String {
@@ -199,45 +209,47 @@ fn dis_load_store_imm(w: u32, mnem: &str) -> String {
     let rt = (w >> 21) & 0x1F; let ra = (w >> 16) & 0x1F;
     let d = sign_extend(w & 0xFFFF, 16);
     if mnem.starts_with('l') && mnem.contains('f') || mnem.starts_with('s') && mnem.contains('f') {
-        format!("{} f{},{}(r{})", mnem, rt, d, ra)
+        format!("{} f{},{}(r{})", mnem, rt, hex_imm(d), ra)
     } else {
-        format!("{} r{},{}(r{})", mnem, rt, d, ra)
+        format!("{} r{},{}(r{})", mnem, rt, hex_imm(d), ra)
     }
 }
 
-fn dis_branch(w: u32) -> String {
+fn dis_branch(w: u32, current_addr: u32) -> String {
     let li = sign_extend(w & 0x03FFFFFC, 26);
     let aa = (w >> 1) & 1; let lk = w & 1;
     let mnem = match (aa, lk) {
         (0, 0) => "b", (0, 1) => "bl", (1, 0) => "ba", (1, 1) => "bla", _ => "b",
     };
-    format!("{} 0x{:X}", mnem, li)
+    let absolute_target = if aa != 0 { li as u32 } else { (current_addr as i32 + li) as u32 };
+    format!("{} 0x{:08X}", mnem, absolute_target)
 }
 
-fn dis_bc(w: u32) -> String {
+fn dis_bc(w: u32, current_addr: u32) -> String {
     let bo = (w >> 21) & 0x1F; let bi = (w >> 16) & 0x1F;
     let bd = sign_extend(w & 0xFFFC, 16);
     let aa = (w >> 1) & 1; let lk = w & 1;
     let cr_field = bi >> 2; let bi_field = bi & 3;
+    let absolute_target = if aa != 0 { bd as u32 } else { (current_addr as i32 + bd) as u32 };
     if bo == 16 && bi == 0 {
         let s = if lk != 0 { "bdnzl" } else { "bdnz" };
-        return if aa != 0 { format!("{}a 0x{:X}", s, bd) } else { format!("{} 0x{:X}", s, bd) };
+        return if aa != 0 { format!("{}a 0x{:08X}", s, absolute_target) } else { format!("{} 0x{:08X}", s, absolute_target) };
     }
     if bo == 18 && bi == 0 {
         let s = if lk != 0 { "bdzl" } else { "bdz" };
-        return if aa != 0 { format!("{}a 0x{:X}", s, bd) } else { format!("{} 0x{:X}", s, bd) };
+        return if aa != 0 { format!("{}a 0x{:08X}", s, absolute_target) } else { format!("{} 0x{:08X}", s, absolute_target) };
     }
     if let Some(cond) = cr_cond(bo, bi_field) {
         let cr_s = if cr_field != 0 { format!("cr{},", cr_field) } else { String::new() };
         let lk_s = if lk != 0 { "l" } else { "" };
         let aa_s = if aa != 0 { "a" } else { "" };
-        return format!("b{}{}{} {}0x{:X}", cond, lk_s, aa_s, cr_s, bd);
+        return format!("b{}{}{} {}0x{:08X}", cond, lk_s, aa_s, cr_s, absolute_target);
     }
     let lk_s = if lk != 0 { "l" } else { "" }; let aa_s = if aa != 0 { "a" } else { "" };
-    format!("bc{}{} {},{},0x{:X}", lk_s, aa_s, bo, bi, bd)
+    format!("bc{}{} {},{},0x{:08X}", lk_s, aa_s, bo, bi, absolute_target)
 }
 
-fn dis_opcode19(w: u32) -> String {
+fn dis_opcode19(w: u32, _current_addr: u32) -> String {
     let xo = (w >> 1) & 0x3FF;
     let bo = (w >> 21) & 0x1F; let bi = (w >> 16) & 0x1F; let lk = w & 1;
     match xo {
@@ -972,56 +984,104 @@ pub fn assemble_instruction(line: &str) -> Result<u32, String> {
     }
 }
 
-pub fn gecko_to_asm(gecko_text: &str) -> Result<String, String> {
-    let mut output = Vec::new();
-    let hex_chars: String = gecko_text.chars().filter(|c| c.is_ascii_hexdigit() || c.is_whitespace() || *c == '\n').collect();
-    let words: Vec<&str> = hex_chars.split_whitespace().collect();
+fn rel_branch_offset(w: u32) -> Option<i32> {
+    let opcode = (w >> 26) & 0x3F;
+    if (w >> 1) & 1 != 0 {
+        return None;
+    }
+    match opcode {
+        18 => Some(sign_extend(w & 0x03FFFFFC, 26)),
+        16 => Some(sign_extend(w & 0xFFFC, 16)),
+        _ => None,
+    }
+}
 
-    let mut i = 0;
-    while i < words.len() {
-        let w = words[i].to_uppercase();
-        if w.len() != 8 {
-            i += 1;
+pub fn gecko_to_asm(gecko_text: &str) -> Result<String, String> {
+    let mut pairs: Vec<(u32, u32)> = Vec::new();
+    for line in gecko_text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
+        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        if tokens.len() < 2 {
+            continue;
+        }
+        let addr_word = tokens[0].to_uppercase();
+        if addr_word.len() != 8 || addr_word == "00000000" {
+            continue;
+        }
+        let val_word = tokens[1].to_uppercase();
+        if let (Ok(raw_addr), Ok(val)) = (u32::from_str_radix(&addr_word, 16), u32::from_str_radix(&val_word, 16)) {
+            pairs.push((console_addr_to_cemu(raw_addr), val));
+        }
+    }
 
-        if let Some(stripped) = w.strip_prefix("C2") {
-            let addr = u32::from_str_radix(stripped, 16).map_err(|e| format!("Invalid hex: {}", e))?;
-            output.push(format!("; ASM patch at 0x{:08X}", addr));
-            i += 1;
-            if i < words.len() {
-                i += 1;
+    pairs.sort_by_key(|&(addr, _)| addr);
+
+    let (cave_pairs, standard_pairs): (Vec<(u32, u32)>, Vec<(u32, u32)>) = pairs
+        .into_iter()
+        .partition(|&(addr, _)| (0x02DF0000..=0x02DFFFFF).contains(&addr));
+
+    let mut blocks: Vec<Vec<(u32, u32)>> = Vec::new();
+    for &(addr, val) in &cave_pairs {
+        if let Some(last) = blocks.last_mut() {
+            if last.last().map_or(false, |&(prev, _)| prev.wrapping_add(4) == addr) {
+                last.push((addr, val));
+                continue;
             }
-            while i < words.len() {
-                let hi = words[i].to_uppercase();
-                if hi == "00000000"
-                    && i + 1 < words.len() && words[i + 1].to_uppercase() == "00000000" {
-                        i += 2;
-                        break;
-                    }
-                if let Ok(val) = u32::from_str_radix(&hi, 16) {
-                    output.push(disassemble_instruction(val));
-                }
-                i += 1;
-            }
-        } else if w == "00000000" {
-            i += 1;
-        } else {
-            let addr = u32::from_str_radix(&w, 16).map_err(|e| format!("Invalid hex: {}", e))?;
-            i += 1;
-            if i < words.len() {
-                let val_word = words[i].to_uppercase();
-                if let Ok(val) = u32::from_str_radix(&val_word, 16) {
-                    let asm = disassemble_instruction(val);
-                    output.push(format!("0x{:08X} = {}", addr, asm));
-                    i += 1;
-                } else {
-                    output.push(format!("; Invalid value: {}", val_word));
-                    i += 1;
-                }
+        }
+        blocks.push(vec![(addr, val)]);
+    }
+
+    let cave_addrs: HashSet<u32> = cave_pairs.iter().map(|&(addr, _)| addr).collect();
+    let mut needed: BTreeSet<u32> = blocks.iter().map(|block| block[0].0).collect();
+    for &(addr, val) in standard_pairs.iter().chain(cave_pairs.iter()) {
+        if let Some(rel) = rel_branch_offset(val) {
+            let target = (addr as i32 + rel) as u32;
+            if cave_addrs.contains(&target) {
+                needed.insert(target);
             }
         }
     }
+    let labels: HashMap<u32, String> = needed
+        .into_iter()
+        .enumerate()
+        .map(|(idx, addr)| (addr, format!("cave{}", idx + 1)))
+        .collect();
+
+    let render = |addr: u32, val: u32| {
+        let mut line = disassemble_instruction(val, addr);
+        if let Some(rel) = rel_branch_offset(val) {
+            let target = (addr as i32 + rel) as u32;
+            if let Some(label) = labels.get(&target) {
+                let target_hex = format!("0x{:08X}", target);
+                line = line.replace(target_hex.as_str(), label);
+            }
+        }
+        line
+    };
+
+    let mut output: Vec<String> = Vec::new();
+    for &(addr, val) in &standard_pairs {
+        output.push(format!("0x{:08X} = {}", addr, render(addr, val)));
+    }
+
+    if !cave_pairs.is_empty() {
+        output.push(String::new());
+        output.push(".origin = codecave".to_string());
+    }
+
+    for block in &blocks {
+        output.push(String::new());
+        for &(addr, val) in block {
+            if let Some(label) = labels.get(&addr) {
+                output.push(format!("{}:", label));
+            }
+            output.push(render(addr, val));
+        }
+    }
+
     Ok(output.join("\n"))
 }
 
@@ -1146,55 +1206,65 @@ mod tests {
 
     #[test]
     fn test_disassemble_li() {
-        assert_eq!(disassemble_instruction(0x38600001), "li r3,1");
+        assert_eq!(disassemble_instruction(0x38600001, 0), "li r3,0x1");
     }
 
     #[test]
     fn test_nop() {
         assert_eq!(assemble_instruction("nop").unwrap_or(0), 0x60000000);
-        assert_eq!(disassemble_instruction(0x60000000), "nop");
+        assert_eq!(disassemble_instruction(0x60000000, 0), "nop");
     }
 
     #[test]
     fn test_blr() {
         assert_eq!(assemble_instruction("blr").unwrap_or(0), 0x4E800020);
-        assert_eq!(disassemble_instruction(0x4E800020), "blr");
+        assert_eq!(disassemble_instruction(0x4E800020, 0), "blr");
     }
 
     #[test]
     fn test_stw() {
         let val = assemble_instruction("stw r3,0(r1)").unwrap_or(0);
-        assert_eq!(disassemble_instruction(val), "stw r3,0(r1)");
+        assert_eq!(disassemble_instruction(val, 0), "stw r3,0x0(r1)");
     }
 
     #[test]
     fn test_lwz() {
         let val = assemble_instruction("lwz r3,4(r1)").unwrap_or(0);
-        assert_eq!(disassemble_instruction(val), "lwz r3,4(r1)");
+        assert_eq!(disassemble_instruction(val, 0), "lwz r3,0x4(r1)");
     }
 
     #[test]
     fn test_addi() {
         let val = assemble_instruction("addi r3,r4,100").unwrap_or(0);
-        assert_eq!(disassemble_instruction(val), "addi r3,r4,100");
+        assert_eq!(disassemble_instruction(val, 0), "addi r3,r4,0x64");
     }
 
     #[test]
     fn test_lis() {
         let val = assemble_instruction("lis r3,0x1234").unwrap_or(0);
-        assert_eq!(disassemble_instruction(val), "lis r3,4660");
+        assert_eq!(disassemble_instruction(val, 0), "lis r3,0x1234");
     }
 
     #[test]
     fn test_roundtrip_add() {
         let val = assemble_instruction("add r3,r4,r5").unwrap_or(0);
-        assert_eq!(disassemble_instruction(val), "add r3,r4,r5");
+        assert_eq!(disassemble_instruction(val, 0), "add r3,r4,r5");
     }
 
     #[test]
     fn test_roundtrip_mr() {
         let val = assemble_instruction("mr r3,r4").unwrap_or(0);
-        assert_eq!(disassemble_instruction(val), "mr r3,r4");
+        assert_eq!(disassemble_instruction(val, 0), "mr r3,r4");
+    }
+
+    #[test]
+    fn test_dis_branch_absolute_target() {
+        assert_eq!(disassemble_instruction(0x48000008, 0x100), "b 0x00000108");
+    }
+
+    #[test]
+    fn test_dis_bc_absolute_target() {
+        assert_eq!(disassemble_instruction(0x40820008, 0x100), "bne 0x00000108");
     }
 
     #[test]
@@ -1203,6 +1273,49 @@ mod tests {
         let gecko = cemu_asm_to_gecko(asm_text, 0x12345678).unwrap_or("".to_string());
         assert!(gecko.contains("12345678"));
         let back = gecko_to_asm(&gecko).unwrap_or("".to_string());
-        assert!(back.contains("li r3,1"));
+        assert!(back.contains("li r3,0x1"));
+    }
+
+    #[test]
+    fn test_gecko_multi_cave_reconstruction() {
+        let gecko = "# test patch\n0E83D2E0 485B7D20\n0E83D2E4 38600001\n0EDF5000 38600002\n0EDF5004 4E800020\n0EDF6000 4BFFF000\n0EDF6004 4E800020";
+        let asm = gecko_to_asm(gecko).unwrap_or("".to_string());
+        assert!(asm.contains("0x0283D2E0 = b cave1"));
+        assert!(asm.contains("0x0283D2E4 = li r3,0x1"));
+        assert!(asm.contains(".origin = codecave"));
+        assert!(asm.contains("cave1:"));
+        assert!(asm.contains("cave2:"));
+        assert!(asm.contains("b cave1"));
+    }
+
+    #[test]
+    fn test_gecko_cave_branch_to_unlabeled_target() {
+        let gecko = "0EDF5000 48000040\n0EDF5004 4E800020";
+        let asm = gecko_to_asm(gecko).unwrap_or("".to_string());
+        assert!(asm.contains("cave1:"));
+        assert!(asm.contains("b 0x02DF5040"));
+    }
+
+    #[test]
+    fn test_gecko_standard_writes_only() {
+        let gecko = "0E83D100 38600001\n0E83D200 4E800020";
+        let asm = gecko_to_asm(gecko).unwrap_or("".to_string());
+        assert!(asm.contains("0x0283D100 = li r3,0x1"));
+        assert!(asm.contains("0x0283D200 = blr"));
+        assert!(!asm.contains("codecave"));
+    }
+
+    #[test]
+    fn test_gecko_contiguous_cave_blocks_get_labels() {
+        let gecko = "0EDF6C0C 2C030000\n0EDF6C10 4C810020\n0EDF6C14 38000000\n0EDF6C18 4B60AD7C\n0E401990 489F527C\n0EDF6C1C 2C030000\n0EDF6C20 4C810020\n0EDF6C24 38000001\n0EDF6C28 4B60ADB4\n0E4019D8 489F5244\n0EDF6C30 2C030000\n0EDF6C34 4081000C\n0EDF6C38 4B21CA19\n0EDF6C3C 4B90D810\n0EDF6C40 4B90D818\n0E704448 486F27E8";
+        let asm = gecko_to_asm(gecko).unwrap_or("".to_string());
+        assert!(asm.contains("0x02401990 = b cave1"));
+        assert!(asm.contains("0x024019D8 = b cave2"));
+        assert!(asm.contains("0x02704448 = b cave3"));
+        assert!(asm.contains("cave1:"));
+        assert!(asm.contains("cave2:"));
+        assert!(asm.contains("cave3:"));
+        assert!(asm.contains("cave4:"));
+        assert!(asm.contains("ble cave4"));
     }
 }

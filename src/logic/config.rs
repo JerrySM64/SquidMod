@@ -12,13 +12,15 @@ pub enum ConnectionMode {
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum NetworkMode {
     Pretendo,
-    Spacebar,
+    Altendo,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct AppConfig {
     pub connection_mode: ConnectionMode,
     pub network_mode: NetworkMode,
+    #[serde(default = "default_check_for_updates")]
+    pub check_for_updates: bool,
 }
 
 impl Default for AppConfig {
@@ -26,8 +28,13 @@ impl Default for AppConfig {
         Self {
             connection_mode: ConnectionMode::Cemu,
             network_mode: NetworkMode::Pretendo,
+            check_for_updates: true,
         }
     }
+}
+
+fn default_check_for_updates() -> bool {
+    true
 }
 
 fn config_path() -> Option<PathBuf> {

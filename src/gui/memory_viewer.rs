@@ -415,14 +415,16 @@ pub fn create_memory_viewer_page(state: &Rc<RefCell<AppState>>) -> adw::Preferen
     
     let state_clone = state.clone();
     let update_view_clone = update_view.clone();
+    let highlighted_address_entry = highlighted_address.clone();
     addr_entry.connect_activate(move |entry: &gtk::Entry| {
         let text = entry.text();
-         if let Ok(addr) = u64::from_str_radix(text.trim().trim_start_matches("0x"), 16) {
+        if let Ok(addr) = u64::from_str_radix(text.trim().trim_start_matches("0x"), 16) {
             let mut state_ref = state_clone.borrow_mut();
-            state_ref.memory_viewer_address = addr;
+            state_ref.memory_viewer_address = addr & !0xF;
+            *highlighted_address_entry.borrow_mut() = Some(addr);
             drop(state_ref);
             update_view_clone();
-         }
+        }
     });
 
     let state_clone = state.clone();

@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use gtk::gio;
 use gtk4 as gtk;
 use libadwaita as adw;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesPage {
@@ -192,7 +192,243 @@ pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesP
 
     asm_row.add_suffix(&asm_btn);
     dump_group.add(&asm_row);
+
+    let utf_row = adw::ActionRow::builder()
+        .title("UTF Converter")
+        .subtitle("Convert between Text and Hex")
+        .build();
+
+    let utf_btn = gtk::Button::builder()
+        .label("Open")
+        .valign(gtk::Align::Center)
+        .build();
+    utf_btn.add_css_class("suggested-action");
+
+    utf_btn.connect_clicked(move |btn| {
+        let root = btn.root().and_then(|r| r.downcast::<gtk::Window>().ok());
+        crate::gui::utf_util::show_utf_window(root.as_ref());
+    });
+
+    utf_row.add_suffix(&utf_btn);
+    dump_group.add(&utf_row);
+
+    let gpc_row = adw::ActionRow::builder()
+        .title("Cemu Graphic Pack Creator")
+        .subtitle("Create Graphic Packs for Cemu")
+        .build();
+
+    let gpc_btn = gtk::Button::builder()
+        .label("Open")
+        .valign(gtk::Align::Center)
+        .build();
+    gpc_btn.add_css_class("suggested-action");
+
+    gpc_btn.connect_clicked(move |btn| {
+        let root = btn.root().and_then(|r| r.downcast::<gtk::Window>().ok());
+        crate::gui::graphic_pack_creator::show_graphic_pack_window(root.as_ref());
+    });
+
+    gpc_row.add_suffix(&gpc_btn);
+    dump_group.add(&gpc_row);
+
     page.add(&dump_group);
+
+    let hexdec_group = adw::PreferencesGroup::builder()
+        .title("Hex / Decimal Converter")
+        .build();
+
+    let conv_model = gtk::StringList::new(&["Hex to Dec", "Dec to Hex"]);
+    let conv_dropdown = gtk::DropDown::builder()
+        .model(&conv_model)
+        .valign(gtk::Align::Center)
+        .build();
+
+    let conv_input_entry = gtk::Entry::builder()
+        .placeholder_text("0x00000000")
+        .width_chars(14)
+        .valign(gtk::Align::Center)
+        .build();
+
+    let conv_input_row = adw::ActionRow::builder()
+        .title("Input")
+        .subtitle("Hex uses optional 0x prefix")
+        .build();
+    conv_input_row.add_suffix(&conv_dropdown);
+    conv_input_row.add_suffix(&conv_input_entry);
+    hexdec_group.add(&conv_input_row);
+
+    let conv_result_entry = gtk::Entry::builder()
+        .editable(false)
+        .width_chars(14)
+        .valign(gtk::Align::Center)
+        .build();
+    conv_result_entry.add_css_class("monospace");
+
+    let conv_result_row = adw::ActionRow::builder()
+        .title("Result")
+        .build();
+    conv_result_row.add_suffix(&conv_result_entry);
+    hexdec_group.add(&conv_result_row);
+
+    let conv_selected = Rc::new(Cell::new(0u32));
+    {
+        let conv_selected = conv_selected.clone();
+        let conv_result_entry = conv_result_entry.clone();
+        let conv_input_entry = conv_input_entry.clone();
+        conv_dropdown.connect_selected_notify(move |dd| {
+            let selected = dd.selected();
+            conv_selected.set(selected);
+            match selected {
+                0 => {
+                    conv_input_entry.set_placeholder_text(Some("0x00000000"));
+                    let raw = conv_input_entry.text().to_string();
+                    let trimmed = raw.trim().trim_start_matches("0x").trim_start_matches("0X");
+                    if raw.trim().is_empty() {
+                        conv_result_entry.set_text("");
+                        conv_input_entry.remove_css_class("error");
+                    } else if let Ok(value) = u64::from_str_radix(trimmed, 16) {
+                        conv_result_entry.set_text(&value.to_string());
+                        conv_input_entry.remove_css_class("error");
+                    } else {
+                        conv_result_entry.set_text("");
+                        conv_input_entry.add_css_class("error");
+                    }
+                }
+                1 => {
+                    conv_input_entry.set_placeholder_text(Some("0"));
+                    let raw = conv_input_entry.text().to_string();
+                    let trimmed = raw.trim();
+                    if raw.trim().is_empty() {
+                        conv_result_entry.set_text("");
+                        conv_input_entry.remove_css_class("error");
+                    } else if let Ok(value) = trimmed.parse::<u64>() {
+                        conv_result_entry.set_text(&format!("{:X}", value));
+                        conv_input_entry.remove_css_class("error");
+                    } else {
+                        conv_result_entry.set_text("");
+                        conv_input_entry.add_css_class("error");
+                    }
+                }
+                _ => {}
+            }
+        });
+    }
+
+    {
+        let conv_selected = conv_selected.clone();
+        let conv_result_entry = conv_result_entry.clone();
+        conv_input_entry.connect_changed(move |e| {
+            let selected = conv_selected.get();
+            if selected == 0 {
+                let raw = e.text().to_string();
+                let trimmed = raw.trim().trim_start_matches("0x").trim_start_matches("0X");
+                if raw.trim().is_empty() {
+                    conv_result_entry.set_text("");
+                    e.remove_css_class("error");
+                } else if let Ok(value) = u64::from_str_radix(trimmed, 16) {
+                    conv_result_entry.set_text(&value.to_string());
+                    e.remove_css_class("error");
+                } else {
+                    conv_result_entry.set_text("");
+                    e.add_css_class("error");
+                }
+            } else if selected == 1 {
+                let raw = e.text().to_string();
+                let trimmed = raw.trim();
+                if raw.trim().is_empty() {
+                    conv_result_entry.set_text("");
+                    e.remove_css_class("error");
+                } else if let Ok(value) = trimmed.parse::<u64>() {
+                    conv_result_entry.set_text(&format!("{:X}", value));
+                    e.remove_css_class("error");
+                } else {
+                    conv_result_entry.set_text("");
+                    e.add_css_class("error");
+                }
+            }
+        });
+    }
+
+    page.add(&hexdec_group);
+
+    let offset_group = adw::PreferencesGroup::builder()
+        .title("Address Offset Calculator")
+        .build();
+
+    let offset_model = gtk::StringList::new(&["Wii U to Cemu", "Cemu to Wii U"]);
+    let offset_dropdown = gtk::DropDown::builder()
+        .model(&offset_model)
+        .valign(gtk::Align::Center)
+        .build();
+
+    let offset_input_entry = gtk::Entry::builder()
+        .placeholder_text("0x10000000")
+        .width_chars(14)
+        .valign(gtk::Align::Center)
+        .build();
+
+    let offset_input_row = adw::ActionRow::builder()
+        .title("Input Address")
+        .subtitle("Enter Address to be converted")
+        .build();
+    offset_input_row.add_suffix(&offset_dropdown);
+    offset_input_row.add_suffix(&offset_input_entry);
+    offset_group.add(&offset_input_row);
+
+    let offset_result_entry = gtk::Entry::builder()
+        .editable(false)
+        .width_chars(14)
+        .valign(gtk::Align::Center)
+        .build();
+    offset_result_entry.add_css_class("monospace");
+
+    let offset_result_row = adw::ActionRow::builder()
+        .title("Output Address")
+        .build();
+    offset_result_row.add_suffix(&offset_result_entry);
+    offset_group.add(&offset_result_row);
+
+    let recalculate: Rc<dyn Fn()> = {
+        let offset_input_entry = offset_input_entry.clone();
+        let offset_result_entry = offset_result_entry.clone();
+        let offset_dropdown = offset_dropdown.clone();
+        Rc::new(move || {
+            let raw = offset_input_entry.text().to_string();
+            let trimmed = raw.trim().trim_start_matches("0x").trim_start_matches("0X");
+            if raw.trim().is_empty() {
+                offset_result_entry.set_text("");
+                offset_input_entry.remove_css_class("error");
+                return;
+            }
+            match u64::from_str_radix(trimmed, 16) {
+                Ok(value) if value <= u32::MAX as u64 => {
+                    let result = if offset_dropdown.selected() == 0 {
+                        (value as i64 - 0x503000) as u64
+                    } else {
+                        value + 0x503000
+                    };
+                    offset_result_entry.set_text(&format!("0x{:08X}", result));
+                    offset_input_entry.remove_css_class("error");
+                }
+                _ => {
+                    offset_result_entry.set_text("");
+                    offset_input_entry.add_css_class("error");
+                }
+            }
+        })
+    };
+
+    {
+        let recalculate = recalculate.clone();
+        offset_input_entry.connect_changed(move |_| recalculate());
+    }
+
+    {
+        let recalculate = recalculate.clone();
+        offset_dropdown.connect_selected_notify(move |_| recalculate());
+    }
+
+    page.add(&offset_group);
 
     let name_group = adw::PreferencesGroup::builder()
         .title("Name Changer")

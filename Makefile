@@ -23,7 +23,7 @@ $(DBG_DIR):
 DEBIAN_IMG := docker.io/library/debian:13
 
 BASE_DEPS := build-essential ca-certificates curl file git pkg-config \
-             libssl-dev libgtk-4-dev libadwaita-1-dev
+             libssl-dev libgtk-4-dev libadwaita-1-dev p7zip-full
 
 INSTALL_RUST = curl https://sh.rustup.rs -sSf | sh -s -- -y && \
                . \$$HOME/.cargo/env
@@ -55,8 +55,8 @@ linux-release: $(REL_DIR)
 		cp \"\$$APPDIR/usr/share/icons/hicolor/256x256/apps/squidmod.png\" \"\$$APPDIR/squidmod.png\" && \
 		ln -s squidmod.png \"\$$APPDIR/.DirIcon\" && \
 		curl -L -o appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage && \
-		chmod +x appimagetool.AppImage && \
-		./appimagetool.AppImage --appimage-extract && \
+		7z x appimagetool.AppImage -osquashfs-root -y && \
+		chmod -R +x squashfs-root && \
 		ARCH=x86_64 ./squashfs-root/AppRun \"\$$APPDIR\" $(APP_NAME)-v$(VERSION)-x86_64.AppImage && \
 		mv $(APP_NAME)-v$(VERSION)-x86_64.AppImage $(REL_DIR)/ && \
 		rm -rf AppDir squashfs-root appimagetool.AppImage"
