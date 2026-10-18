@@ -13,7 +13,7 @@
 
 [x] Look into porting codecaves - experimental and may remain as such
 
-[ ] Implement Graphic Pack Creator
+[x] Implement Graphic Pack Creator
 
 [x] Clean up GUI Codebase
 

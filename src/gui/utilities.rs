@@ -212,6 +212,25 @@ pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesP
     utf_row.add_suffix(&utf_btn);
     dump_group.add(&utf_row);
 
+    let gpc_row = adw::ActionRow::builder()
+        .title("Cemu Graphic Pack Creator")
+        .subtitle("Create Graphic Packs for Cemu")
+        .build();
+
+    let gpc_btn = gtk::Button::builder()
+        .label("Open")
+        .valign(gtk::Align::Center)
+        .build();
+    gpc_btn.add_css_class("suggested-action");
+
+    gpc_btn.connect_clicked(move |btn| {
+        let root = btn.root().and_then(|r| r.downcast::<gtk::Window>().ok());
+        crate::gui::graphic_pack_creator::show_graphic_pack_window(root.as_ref());
+    });
+
+    gpc_row.add_suffix(&gpc_btn);
+    dump_group.add(&gpc_row);
+
     page.add(&dump_group);
 
     let hexdec_group = adw::PreferencesGroup::builder()

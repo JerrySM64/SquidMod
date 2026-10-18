@@ -1,6 +1,7 @@
 pub mod asmutil;
 pub mod config;
 pub mod connection;
+pub mod graphic_pack_creator;
 pub mod matchinfo;
 pub mod playerinfo;
 pub mod plugin_loop;

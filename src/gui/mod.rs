@@ -1,5 +1,6 @@
 pub mod app_state;
 pub mod asm_util;
+pub mod graphic_pack_creator;
 pub mod main_window;
 pub mod match_info;
 pub mod memory_viewer;
