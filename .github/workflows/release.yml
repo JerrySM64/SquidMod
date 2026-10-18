@@ -26,15 +26,15 @@ jobs:
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-gtk4
-            mingw-w64-x86_64-libadwaita
-            mingw-w64-x86_64-pkg-config
-            mingw-w64-x86_64-rust
-            mingw-w64-x86_64-nsis
-            mingw-w64-x86_64-7zip
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-libadwaita
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-nsis
+            mingw-w64-ucrt-x86_64-7zip
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
