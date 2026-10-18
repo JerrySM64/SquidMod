@@ -318,7 +318,24 @@ pub(crate) fn build_ui(app: &adw::Application) {
                 .website("https://github.com/JerrySM64/SquidMod")
                 .license_type(gtk::License::MitX11)
                 .release_notes(
-                    "<p>Fixed a bug where the Spacebar telemetry failed with a server error.</p>",
+                    "<p><em>New Features</em></p>\
+                    <ul>\
+                    <li>UTF Converter</li>\
+                    <li>Cemu Graphic Pack Creator</li>\
+                    <li>Hex / Decimal Converter</li>\
+                    <li>Address Offset Calculator</li>\
+                    <li>Update Check</li>\
+                    </ul>\
+                    <p><em>Changes</em></p>\
+                    <ul>\
+                    <li>Replace Spacebar Support with Altendo Support</li>\
+                    <li>Experimental Support for Codecaves in Assembler Utility</li>\
+                    <li>Add Note about Wii U Support being experimental</li>\
+                    </ul>\
+                    <p><em>Fixes</em></p>\
+                    <ul>\
+                    <li>Fix Memory Viewer Table alignment</li>\
+                    </ul>",
                 )
                 .build();
             about.add_link("Donate", "https://ko-fi.com/jerrysm64");
