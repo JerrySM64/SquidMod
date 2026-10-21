@@ -6,12 +6,13 @@ use std::time::Duration;
 
 const PORT: u16 = 7331;
 const CMD_READ_MEMORY: u8 = 0x04;
-const CMD_POKE_8: u8 = 0x01;
-const CMD_POKE_16: u8 = 0x02;
-const CMD_POKE_32: u8 = 0x03;
-const STATUS_NON_ZEROS: u8 = 0xBD;
+const CMD_UPLOAD_MEMORY: u8 = 0x41;
+const CMD_RPC: u8 = 0x70;
+const CMD_GET_BUFFER_SIZE: u8 = 0x51;
 const STATUS_ONLY_ZEROS: u8 = 0xB0;
-const CHUNK_SIZE: usize = 0x5000;
+const RPC_UNUSED_ARG: u32 = 0xfecad0ba;
+const DEFAULT_MAX_BUFFER_SIZE: usize = 0x400;
+const TIMEOUT: Duration = Duration::from_millis(5000);
 
 fn translate_address(addr: u64) -> u64 {
     const WIIU_OFFSET: u64 = 0x503000;
@@ -24,6 +25,7 @@ fn translate_address(addr: u64) -> u64 {
 #[derive(Clone)]
 pub struct WiiUMemory {
     stream: Arc<Mutex<TcpStream>>,
+    max_buffer_size: usize,
 }
 
 impl WiiUMemory {
@@ -35,13 +37,25 @@ impl WiiUMemory {
         let sock_addr = addrs
             .next()
             .ok_or_else(|| anyhow!("No addresses resolved for {}", ip))?;
-        let stream =
-            TcpStream::connect_timeout(&sock_addr, Duration::from_secs(5))
-                .with_context(|| format!("Failed to connect to Wii U at {}", ip))?;
-        stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+        let mut stream = TcpStream::connect_timeout(&sock_addr, TIMEOUT)
+            .with_context(|| format!("Failed to connect to Wii U at {}", ip))?;
+        stream.set_read_timeout(Some(TIMEOUT))?;
+        stream.set_write_timeout(Some(TIMEOUT))?;
+        stream
+            .write_all(&[CMD_GET_BUFFER_SIZE])
+            .context("Failed to send buffer size handshake")?;
+        let mut buffer = [0u8; 4];
+        stream
+            .read_exact(&mut buffer)
+            .context("Failed to read buffer size handshake response")?;
+        let max_buffer_size = u32::from_be_bytes(buffer) as usize;
         Ok(Self {
             stream: Arc::new(Mutex::new(stream)),
+            max_buffer_size: if max_buffer_size == 0 {
+                DEFAULT_MAX_BUFFER_SIZE
+            } else {
+                max_buffer_size
+            },
         })
     }
 
@@ -49,7 +63,9 @@ impl WiiUMemory {
         let mut stream = self.stream.lock().map_err(|_| anyhow!("Stream mutex poisoned"))?;
         let target = translate_address(address);
         let start = target as u32;
-        let end = start.checked_add(length as u32)
+        let len = u32::try_from(length).map_err(|_| anyhow!("Read length too large"))?;
+        let end = start
+            .checked_add(len)
             .ok_or_else(|| anyhow!("Read address overflow (Wii U target: 0x{:08X})", target))?;
         let mut header = [0u8; 9];
         header[0] = CMD_READ_MEMORY;
@@ -57,51 +73,58 @@ impl WiiUMemory {
         header[5..9].copy_from_slice(&end.to_be_bytes());
         stream.write_all(&header).context("Failed to send read command")?;
 
+        let mut status = [0u8; 1];
+        stream
+            .read_exact(&mut status)
+            .context("Failed to read status byte")?;
+        if status[0] == STATUS_ONLY_ZEROS {
+            return Ok(vec![0u8; length]);
+        }
+
         let mut result = Vec::with_capacity(length);
         let mut remaining = length;
         while remaining > 0 {
-            let chunk_len = remaining.min(CHUNK_SIZE);
-            let mut status = [0u8; 1];
-            stream.read_exact(&mut status).context("Failed to read chunk status")?;
-            match status[0] {
-                STATUS_NON_ZEROS => {
-                    let mut buf = vec![0u8; chunk_len];
-                    stream.read_exact(&mut buf).context("Failed to read chunk data")?;
-                    result.extend_from_slice(&buf);
-                }
-                STATUS_ONLY_ZEROS => {
-                    result.extend(std::iter::repeat(0u8).take(chunk_len));
-                }
-                b => return Err(anyhow!("Unexpected read status byte: 0x{:02X}", b)),
-            }
+            let chunk_len = remaining.min(self.max_buffer_size);
+            let mut buffer = vec![0u8; chunk_len];
+            stream
+                .read_exact(&mut buffer)
+                .context("Failed to read chunk data")?;
+            result.extend_from_slice(&buffer);
             remaining -= chunk_len;
         }
         Ok(result)
     }
 
-    fn tcp_write(&self, cmd: u8, address: u64, value: u32) -> Result<()> {
+    fn tcp_write(&self, address: u64, data: &[u8]) -> Result<()> {
+        if data.is_empty() {
+            return Ok(());
+        }
         let mut stream = self.stream.lock().map_err(|_| anyhow!("Stream mutex poisoned"))?;
         let target = translate_address(address);
-        let addr = target as u32;
-        let mut packet = [0u8; 9];
-        packet[0] = cmd;
-        packet[1..5].copy_from_slice(&addr.to_be_bytes());
-        packet[5..9].copy_from_slice(&value.to_be_bytes());
-        stream.write_all(&packet).context("Failed to send write command")
+        let start = target as u32;
+        let len = u32::try_from(data.len()).map_err(|_| anyhow!("Write length too large"))?;
+        let end = start
+            .checked_add(len)
+            .ok_or_else(|| anyhow!("Write address overflow (Wii U target: 0x{:08X})", target))?;
+        let mut header = [0u8; 9];
+        header[0] = CMD_UPLOAD_MEMORY;
+        header[1..5].copy_from_slice(&start.to_be_bytes());
+        header[5..9].copy_from_slice(&end.to_be_bytes());
+        stream.write_all(&header).context("Failed to send write command")?;
+        let mut offset = 0usize;
+        while offset < data.len() {
+            let chunk_len = (data.len() - offset).min(self.max_buffer_size);
+            stream
+                .write_all(&data[offset..offset + chunk_len])
+                .context("Failed to send write payload")?;
+            offset += chunk_len;
+        }
+        stream.flush().context("Failed to flush write payload")?;
+        Ok(())
     }
 
     pub fn read_bytes(&self, address: u64, length: usize) -> Result<Vec<u8>> {
-        let mut result = Vec::with_capacity(length);
-        let mut remaining = length;
-        let mut offset = 0u64;
-        while remaining > 0 {
-            let chunk = remaining.min(0x400);
-            let bytes = self.tcp_read(address + offset, chunk)?;
-            result.extend_from_slice(&bytes);
-            remaining -= chunk;
-            offset += chunk as u64;
-        }
-        Ok(result)
+        self.tcp_read(address, length)
     }
 
     pub fn read_u32(&self, address: u64) -> Result<u32> {
@@ -110,33 +133,41 @@ impl WiiUMemory {
     }
 
     pub fn write_bytes(&self, address: u64, data: &[u8]) -> Result<()> {
-        let padded_len = (data.len() + 3) & !3;
-        let mut padded = data.to_vec();
-        padded.resize(padded_len, 0);
-        let mut offset = 0usize;
-        while offset < padded.len() {
-            let value = u32::from_be_bytes([
-                padded[offset],
-                padded[offset + 1],
-                padded[offset + 2],
-                padded[offset + 3],
-            ]);
-            self.tcp_write(CMD_POKE_32, address + offset as u64, value)?;
-            offset += 4;
-        }
-        Ok(())
+        self.tcp_write(address, data)
     }
 
     pub fn write_u8(&self, address: u64, value: u8) -> Result<()> {
-        self.tcp_write(CMD_POKE_8, address, value as u32)
+        self.tcp_write(address, &[value])
     }
 
     pub fn write_u16(&self, address: u64, value: u16) -> Result<()> {
-        self.tcp_write(CMD_POKE_16, address, value as u32)
+        self.tcp_write(address, &value.to_be_bytes())
     }
 
     pub fn write_u32(&self, address: u64, value: u32) -> Result<()> {
-        self.tcp_write(CMD_POKE_32, address, value)
+        self.tcp_write(address, &value.to_be_bytes())
+    }
+
+    pub fn call_function64(&self, address: u64, args: &[u32]) -> Result<u64> {
+        let mut stream = self.stream.lock().map_err(|_| anyhow!("Stream mutex poisoned"))?;
+        let target = translate_address(address) as u32;
+        let mut packet = [0u8; 37];
+        packet[0] = CMD_RPC;
+        packet[1..5].copy_from_slice(&target.to_be_bytes());
+        for i in 0..8 {
+            let value = args.get(i).copied().unwrap_or(RPC_UNUSED_ARG);
+            packet[5 + i * 4..9 + i * 4].copy_from_slice(&value.to_be_bytes());
+        }
+        stream.write_all(&packet).context("Failed to send RPC command")?;
+        let mut response = [0u8; 8];
+        stream
+            .read_exact(&mut response)
+            .context("Failed to read RPC response")?;
+        Ok(u64::from_be_bytes(response))
+    }
+
+    pub fn call_function(&self, address: u64, args: &[u32]) -> Result<u32> {
+        Ok((self.call_function64(address, args)? >> 32) as u32)
     }
 
     pub fn write_utf16be(&self, address: u64, text: &str) -> Result<()> {
@@ -144,7 +175,7 @@ impl WiiUMemory {
         for c in text.encode_utf16() {
             buffer.extend(&c.to_be_bytes());
         }
-        self.write_bytes(address, &buffer)
+        self.tcp_write(address, &buffer)
     }
 
     pub fn read_utf16be(&self, address: u64, max_length: usize) -> Result<String> {
