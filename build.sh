@@ -16,12 +16,12 @@ else
     exit 1
 fi
 
-cp -r /mingw64/lib/gdk-pixbuf-2.0 pkg/lib/ 2>/dev/null || true
-cp -r /mingw64/lib/gtk-4.0 pkg/lib/ 2>/dev/null || true
+cp -r /ucrt64/lib/gdk-pixbuf-2.0 pkg/lib/ 2>/dev/null || true
+cp -r /ucrt64/lib/gtk-4.0 pkg/lib/ 2>/dev/null || true
 
 echo "Resolving DLL dependencies..."
 for i in 1 2 3 4; do
-    find pkg -type f \( -name "*.exe" -o -name "*.dll" \) | xargs ldd 2>/dev/null | grep -o "/mingw64/bin/[^ ]*\.dll" | sort -u | while read -r file; do
+    find pkg -type f \( -name "*.exe" -o -name "*.dll" \) | xargs ldd 2>/dev/null | grep -o "/ucrt64/bin/[^ ]*\.dll" | sort -u | while read -r file; do
         if [ -f "$file" ]; then
             cp -u "$file" pkg/
         fi
@@ -30,12 +30,12 @@ done
 
 echo "Compiling GLib schemas..."
 mkdir -p pkg/share/glib-2.0/schemas
-cp -r /mingw64/share/glib-2.0/schemas/* pkg/share/glib-2.0/schemas/
+cp -r /ucrt64/share/glib-2.0/schemas/* pkg/share/glib-2.0/schemas/
 glib-compile-schemas pkg/share/glib-2.0/schemas
 
 mkdir -p pkg/share/icons
-cp -r /mingw64/share/icons/hicolor pkg/share/icons/
-cp -r /mingw64/share/icons/Adwaita pkg/share/icons/ || true
+cp -r /ucrt64/share/icons/hicolor pkg/share/icons/
+cp -r /ucrt64/share/icons/Adwaita pkg/share/icons/ || true
 
 mkdir -p pkg/share/themes
 
