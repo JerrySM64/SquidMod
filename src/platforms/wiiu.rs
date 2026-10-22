@@ -16,9 +16,9 @@ const TIMEOUT: Duration = Duration::from_millis(5000);
 
 fn translate_address(addr: u64) -> u64 {
     const WIIU_OFFSET: u64 = 0x503000;
-    let in_rodata = addr >= 0x10000000 && addr <= 0x101DCB94;
-    let in_data   = addr >= 0x101DCBA0 && addr <= 0x101E9710;
-    let in_bss    = addr >= 0x101EA000 && addr <= 0x1026F568;
+    let in_rodata = (0x10000000..=0x101DCB94).contains(&addr);
+    let in_data   = (0x101DCBA0..=0x101E9710).contains(&addr);
+    let in_bss    = (0x101EA000..=0x1026F568).contains(&addr);
     if in_rodata || in_data || in_bss { addr + WIIU_OFFSET } else { addr }
 }
 

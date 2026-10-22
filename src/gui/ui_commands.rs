@@ -90,10 +90,10 @@ pub fn setup_ui_event_loop(
                     let group = adw::PreferencesGroup::builder().title(&title).build();
                     let mut s = state_clone.borrow_mut();
 
-                    if let Some(page_weak) = s.injected_groups.get(&host_tab) {
-                        if let Some(page) = page_weak.upgrade() {
-                            page.add(&group);
-                        }
+                    if let Some(page_weak) = s.injected_groups.get(&host_tab)
+                        && let Some(page) = page_weak.upgrade()
+                    {
+                        page.add(&group);
                     }
 
                     s.group_table.insert(
@@ -128,7 +128,7 @@ pub fn setup_ui_event_loop(
 
                     let tx = s.global_tx.clone();
                     switch.connect_active_notify(move |sw| {
-                        let _ = tx.send(crate::plugin::PluginEvent::ToggleChanged(
+                        let _ = tx.send(crate::plugin::PluginEvent::Toggle(
                             handle,
                             sw.is_active(),
                         ));
@@ -167,7 +167,7 @@ pub fn setup_ui_event_loop(
                                 let switch = gtk::Switch::new();
                                 switch.set_valign(gtk::Align::Center);
                                 switch.connect_active_notify(move |sw| {
-                                    let _ = tx.send(crate::plugin::PluginEvent::ToggleChanged(
+                                    let _ = tx.send(crate::plugin::PluginEvent::Toggle(
                                         handle,
                                         sw.is_active(),
                                     ));
@@ -187,7 +187,7 @@ pub fn setup_ui_event_loop(
                                     .valign(gtk::Align::Center)
                                     .build();
                                 entry.connect_changed(move |e| {
-                                    let _ = tx.send(crate::plugin::PluginEvent::TextChanged(
+                                    let _ = tx.send(crate::plugin::PluginEvent::Text(
                                         handle,
                                         e.text().to_string(),
                                     ));
@@ -203,7 +203,7 @@ pub fn setup_ui_event_loop(
                                 let dropdown = gtk::DropDown::from_strings(&items);
                                 dropdown.set_valign(gtk::Align::Center);
                                 dropdown.connect_selected_notify(move |dd| {
-                                    let _ = tx.send(crate::plugin::PluginEvent::DropdownChanged(
+                                    let _ = tx.send(crate::plugin::PluginEvent::Dropdown(
                                         handle,
                                         dd.selected() as u64,
                                     ));
@@ -234,7 +234,7 @@ pub fn setup_ui_event_loop(
                 }
                 UiCommand::UnregisterAll => {
                     let mut s = state_clone.borrow_mut();
-                    for (_handle, tab) in &s.tab_table {
+                    for tab in s.tab_table.values() {
                         if let Some(ref cs) = s.content_stack {
                             cs.remove(&tab.page);
                         }
@@ -242,15 +242,13 @@ pub fn setup_ui_event_loop(
                             sl.remove(&tab.sidebar_row);
                         }
                     }
-                    for (_handle, group) in &s.group_table {
-                        if group.is_injected {
-                            if let Some(ref host_tab_name) = group.host_tab_name {
-                                if let Some(page_weak) = s.injected_groups.get(host_tab_name) {
-                                    if let Some(page) = page_weak.upgrade() {
-                                        page.remove(&group.group);
-                                    }
-                                }
-                            }
+                    for group in s.group_table.values() {
+                        if group.is_injected
+                            && let Some(ref host_tab_name) = group.host_tab_name
+                            && let Some(page_weak) = s.injected_groups.get(host_tab_name)
+                            && let Some(page) = page_weak.upgrade()
+                        {
+                            page.remove(&group.group);
                         }
                     }
                     s.tab_table.clear();

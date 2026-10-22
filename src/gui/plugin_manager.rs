@@ -142,12 +142,11 @@ fn populate_plugins_group(
         let idx = i;
         enable_switch.connect_active_notify(move |sw| {
             let active = sw.is_active();
-            if let Ok(s) = state_sw.try_borrow() {
-                if let Ok(mut es) = s.engine_state.try_lock() {
-                    if let Some(plugin) = es.plugin_manager.plugins.get_mut(idx) {
-                        plugin.enabled = active;
-                    }
-                }
+            if let Ok(s) = state_sw.try_borrow()
+                && let Ok(mut es) = s.engine_state.try_lock()
+                && let Some(plugin) = es.plugin_manager.plugins.get_mut(idx)
+            {
+                plugin.enabled = active;
             }
             let state_clone = state_sw.clone();
             gtk::glib::MainContext::default().spawn_local(async move {
@@ -164,14 +163,12 @@ fn populate_plugins_group(
                         }
                     }
                     for (_, group) in groups {
-                        if group.is_injected {
-                            if let Some(ref host_tab_name) = group.host_tab_name {
-                                if let Some(page_weak) = s.injected_groups.get(host_tab_name) {
-                                    if let Some(page) = page_weak.upgrade() {
-                                        page.remove(&group.group);
-                                    }
-                                }
-                            }
+                        if group.is_injected
+                            && let Some(ref host_tab_name) = group.host_tab_name
+                            && let Some(page_weak) = s.injected_groups.get(host_tab_name)
+                            && let Some(page) = page_weak.upgrade()
+                        {
+                            page.remove(&group.group);
                         }
                     }
                     if let Ok(mut es) = s.engine_state.lock() {

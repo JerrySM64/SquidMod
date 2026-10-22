@@ -96,11 +96,7 @@ pub fn create_scene_info_page(state: &Rc<RefCell<AppState>>) -> adw::Preferences
         
         let info_res = {
             let es = state_ref.engine_state.lock().unwrap();
-            if let Some(pm) = &es.pmem {
-                Some(fetch_scene_info(pm))
-            } else {
-                None
-            }
+            es.pmem.as_ref().map(fetch_scene_info)
         };
 
         if let Some(res) = info_res {

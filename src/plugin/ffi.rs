@@ -72,17 +72,17 @@ fn read_guest_str(caller: &mut Caller<'_, HostState>, ptr: u32, len: u32) -> Str
 
 fn write_guest_scratch(caller: &mut Caller<'_, HostState>, s: &str) {
     let mut sqm_ptr = None;
-    if let Some(wasmtime::Extern::Func(f)) = caller.get_export("sqm_scratch_ptr") {
-        if let Ok(tf) = f.typed::<(), u32>(&*caller) {
-            sqm_ptr = tf.call(&mut *caller, ()).ok();
-        }
+    if let Some(wasmtime::Extern::Func(f)) = caller.get_export("sqm_scratch_ptr")
+        && let Ok(tf) = f.typed::<(), u32>(&*caller)
+    {
+        sqm_ptr = tf.call(&mut *caller, ()).ok();
     }
 
     let mut sqm_len = None;
-    if let Some(wasmtime::Extern::Func(f)) = caller.get_export("sqm_scratch_len") {
-        if let Ok(tf) = f.typed::<(), u32>(&*caller) {
-            sqm_len = tf.call(&mut *caller, ()).ok();
-        }
+    if let Some(wasmtime::Extern::Func(f)) = caller.get_export("sqm_scratch_len")
+        && let Ok(tf) = f.typed::<(), u32>(&*caller)
+    {
+        sqm_len = tf.call(&mut *caller, ()).ok();
     }
 
     if let (Some(ptr), Some(cap)) = (sqm_ptr, sqm_len) {
