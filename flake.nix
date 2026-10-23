@@ -11,6 +11,25 @@
       overlays.default = final: prev: {
         squidmod = self.packages.${prev.stdenv.hostPlatform.system}.default;
       };
+
+      nixosModules = {
+        default = self.nixosModules.squidmod;
+        squidmod = { config, lib, pkgs, ... }:
+          let
+            cfg = config.programs.squidmod;
+          in
+          {
+            options.programs.squidmod = {
+              enable = lib.mkEnableOption "SquidMod, a modding tool for Splatoon on Cemu/Xapfish";
+            };
+
+            config = lib.mkIf cfg.enable {
+              environment.systemPackages = [
+                self.packages.${pkgs.system}.default
+              ];
+            };
+          };
+      };
     }
     // flake-utils.lib.eachDefaultSystem (system:
       let
