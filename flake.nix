@@ -25,7 +25,7 @@
 
             config = lib.mkIf cfg.enable {
               environment.systemPackages = [
-                self.packages.${pkgs.system}.default
+                self.packages.${pkgs.stdenv.hostPlatform.system}.default
               ];
             };
           };
@@ -89,9 +89,10 @@
         };
 
         apps = {
-          default = flake-utils.lib.mkApp {
-            drv = squidmod;
-            exePath = "/bin/SquidMod";
+          default = {
+            type = "app";
+            program = pkgs.lib.getExe squidmod;
+            meta.description = "Modding Tool for Splatoon on Cemu/Xapfish";
           };
           squidmod = self.apps.${system}.default;
         };
