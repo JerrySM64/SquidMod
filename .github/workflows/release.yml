@@ -46,12 +46,16 @@ jobs:
           key: windows-release-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: windows-release-
 
+      - name: Determine version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
+
       - name: Build
         run: cargo build --release
 
       - name: Create portable ZIP
         run: |
-          export VERSION=${{ github.ref_name }}
           ./build.sh
           ZIP_NAME=$(cat zip_name.txt)
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
@@ -59,7 +63,7 @@ jobs:
       - name: Build NSIS installer
         run: |
           cp assets/icon.ico pkg/icon.ico 2>/dev/null || true
-          makensis //DVERSION=${{ github.ref_name }} //DOUTFILE=SquidMod-${{ github.ref_name }}-x64.exe SquidModInstaller.nsi
+          makensis //DVERSION=$VERSION //DOUTFILE=SquidMod-v$VERSION-x64-Installer.exe SquidModInstaller.nsi
 
       - name: Upload portable ZIP
         uses: actions/upload-artifact@v4
@@ -71,10 +75,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: SquidMod-${{ github.ref_name }}-x64.exe
+          path: SquidMod-v${{ env.VERSION }}-x64-Installer.exe
 
   build-linux-glibc:
-    name: Build Linux AppImage (glibc)
+    name: Build Linux AppImage
     runs-on: ubuntu-latest
     container: debian:13
 
@@ -165,19 +169,32 @@ jobs:
           key: macos-release-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: macos-release-
 
+      - name: Determine version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
+
       - name: Build macOS release
         run: make macos-release
 
-      - name: Zip app bundle
+      - name: Create DMG
         run: |
-          cd build/release
-          zip -r ../../SquidMod-${{ github.ref_name }}-macOS.zip SquidMod.app
+          DMG_ROOT=dmg-root
+          DMG_NAME="SquidMod-v${VERSION}-macOS.dmg"
+          mkdir -p "$DMG_ROOT"
+          ditto build/release/SquidMod.app "$DMG_ROOT/SquidMod.app"
+          ln -s /Applications "$DMG_ROOT/Applications"
+          for attempt in 1 2 3; do
+            hdiutil create -volname "SquidMod" -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG_NAME" && break
+            sleep 5
+          done
+          test -f "$DMG_NAME"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-app
-          path: SquidMod-${{ github.ref_name }}-macOS.zip
+          path: SquidMod-v${{ env.VERSION }}-macOS.dmg
 
   release:
     name: Publish GitHub Release
@@ -214,3 +231,4 @@ jobs:
             SquidMod-*.zip
             SquidMod-*.exe
             SquidMod-*.AppImage
+            SquidMod-*.dmg

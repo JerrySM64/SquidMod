@@ -23,7 +23,6 @@ pub fn show_settings_window(
     let page = adw::PreferencesPage::new();
     let group = adw::PreferencesGroup::builder()
         .title("Connection")
-        .description("Wii U Connection is experimental. Expect crashes!")
         .build();
 
     let action_row = adw::ActionRow::builder()

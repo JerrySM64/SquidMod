@@ -39,7 +39,7 @@ cp -r /ucrt64/share/icons/Adwaita pkg/share/icons/ || true
 
 mkdir -p pkg/share/themes
 
-ZIP_NAME="${APP_NAME}-v${VERSION}-x86_64.zip"
+ZIP_NAME="${APP_NAME}-v${VERSION}-x64-Windows.zip"
 echo "Creating archive: $ZIP_NAME"
 
 cd pkg
