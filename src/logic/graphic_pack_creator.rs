@@ -22,10 +22,27 @@ pub fn generate_patches_txt(patch_name: &str, patch_text: &str) -> Option<String
     ))
 }
 
+fn has_codecave(patch_text: &str) -> bool {
+    patch_text.lines().any(|line| {
+        let code = line.split(['#', ';']).next().unwrap_or("");
+        let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+        compact.eq_ignore_ascii_case(".origin=codecave")
+    })
+}
+
+pub fn patch_file_name(patch_name: &str, patch_text: &str) -> String {
+    if has_codecave(patch_text) {
+        format!("patch_{}.asm", patch_name)
+    } else {
+        "patches.txt".to_string()
+    }
+}
+
 pub struct GeneratedPack {
     pub name: String,
     pub rules_txt: String,
     pub patches_txt: Option<String>,
+    pub patches_file: String,
     pub content_dir: Option<PathBuf>,
 }
 
@@ -52,6 +69,7 @@ pub fn generate_pack(
         name: name.trim().to_string(),
         rules_txt: generate_rules_txt(name, rules_path, description),
         patches_txt: generate_patches_txt(patch_header, patch_text),
+        patches_file: patch_file_name(patch_header, patch_text),
         content_dir: content_dir.map(|p| p.to_path_buf()),
     }
 }
@@ -64,7 +82,7 @@ pub fn build_output_entries(pack: &GeneratedPack) -> Vec<OutputEntry> {
 
     if let Some(patches) = &pack.patches_txt {
         entries.push(OutputEntry::File {
-            relative_path: PathBuf::from(&pack.name).join("patches.txt"),
+            relative_path: PathBuf::from(&pack.name).join(&pack.patches_file),
             contents: patches.clone(),
         });
     }
@@ -77,4 +95,21 @@ pub fn build_output_entries(pack: &GeneratedPack) -> Vec<OutputEntry> {
     }
 
     entries
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codecave_patches_are_saved_as_asm() {
+        assert_eq!(patch_file_name("Debug-Move", ".origin=codecave\nnop"), "patch_Debug-Move.asm");
+        assert_eq!(patch_file_name("Debug-Move", "  .ORIGIN = CodeCave ; cave\nnop"), "patch_Debug-Move.asm");
+    }
+
+    #[test]
+    fn plain_patches_stay_patches_txt() {
+        assert_eq!(patch_file_name("Debug-Move", "0x0283D2E0 = li r3,1"), "patches.txt");
+        assert_eq!(patch_file_name("Debug-Move", "# .origin = codecave\n0x0283D2E0 = nop"), "patches.txt");
+    }
 }

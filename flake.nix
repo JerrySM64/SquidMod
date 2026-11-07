@@ -37,7 +37,7 @@
 
         squidmod = pkgs.rustPlatform.buildRustPackage {
           pname = "squidmod";
-          version = "9.0.0";
+          version = "9.1.0";
           src = ./.;
 
           cargoLock = {
