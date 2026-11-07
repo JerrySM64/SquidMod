@@ -155,7 +155,7 @@ fn get_pnid(pid: i32, network_mode: NetworkMode) -> String {
 
 fn decode_name(bytes: &[u8]) -> String {
     let mut out = Vec::new();
-    for chunk in bytes.chunks_exact(2) {
+    for chunk in bytes.as_chunks::<2>().0 {
         let code = u16::from_be_bytes([chunk[0], chunk[1]]);
         if code == 0 {
             break;

@@ -44,10 +44,10 @@ pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesP
                     .body("Please connect to Cemu first.")
                     .build();
                 dialog.add_response("ok", "OK");
-                if let Some(root) = btn.root() {
-                    if let Ok(window) = root.downcast::<gtk::Window>() {
-                        dialog.present(Some(&window));
-                    }
+                if let Some(root) = btn.root()
+                    && let Ok(window) = root.downcast::<gtk::Window>()
+                {
+                    dialog.present(Some(&window));
                 }
                 return;
             }
@@ -80,9 +80,10 @@ pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesP
         }
         file_dialog.set_filters(Some(&filters));
 
-        if let Some(root) = btn.root() {
-            if let Ok(root_window) = root.downcast::<gtk::Window>() {
-                let root_clone = root_window.clone();
+        if let Some(root) = btn.root()
+            && let Ok(root_window) = root.downcast::<gtk::Window>()
+        {
+            let root_clone = root_window.clone();
                 file_dialog.save(Some(&root_window), gio::Cancellable::NONE, move |res| {
                     if let Ok(file) = res
                         && let Some(path) = file.path()
@@ -166,7 +167,6 @@ pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesP
                         }
                     }
                 });
-            }
         }
     });
 
@@ -455,10 +455,10 @@ pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesP
     name_entry.connect_changed(move |e| {
         let text = e.text().to_string();
         switch_entry.set_sensitive(!text.is_empty());
-        if switch_entry.is_active() {
-            if let Ok(s) = state_name_entry.try_borrow() {
-                crate::logic::utilities::write_name_to_memory(&s.engine_state, &text);
-            }
+        if switch_entry.is_active()
+            && let Ok(s) = state_name_entry.try_borrow()
+        {
+            crate::logic::utilities::write_name_to_memory(&s.engine_state, &text);
         }
     });
 
@@ -468,7 +468,7 @@ pub fn create_utilities_page(state: &Rc<RefCell<AppState>>) -> adw::PreferencesP
         let active = sw.is_active();
         if let Ok(s) = state_name.try_borrow() {
             if active {
-                crate::logic::utilities::write_name_to_memory(&s.engine_state, &entry_sw.text().to_string());
+                crate::logic::utilities::write_name_to_memory(&s.engine_state, entry_sw.text().as_ref());
             } else {
                 crate::logic::utilities::write_name_to_memory(&s.engine_state, "");
             }

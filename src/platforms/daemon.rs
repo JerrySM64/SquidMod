@@ -333,13 +333,10 @@ mod imp {
             }
             let probe_addr = start.wrapping_add(PROBE_OFFSET);
             let mut buf = vec![0u8; PROBE_READ_LEN];
-            if mem_file.read_exact_at(&mut buf, probe_addr).is_ok() {
-                if buf
-                    .windows(crate::PATTERN.len())
-                    .any(|w| w == crate::PATTERN)
-                {
-                    return Ok(start.wrapping_add(PROBE_OFFSET).wrapping_sub(0x1000_0000));
-                }
+            if mem_file.read_exact_at(&mut buf, probe_addr).is_ok()
+                && buf.windows(crate::PATTERN.len()).any(|w| w == crate::PATTERN)
+            {
+                return Ok(start.wrapping_add(PROBE_OFFSET).wrapping_sub(0x1000_0000));
             }
         }
         Err(anyhow!("Failed to find Wii U RAM region"))

@@ -273,19 +273,18 @@ pub(crate) fn build_ui(app: &adw::Application) {
             }
         };
 
-        if should_reset {
-            if let Ok(state_ref) = state_clone.try_borrow() {
-                if let Ok(mut es) = state_ref.engine_state.try_lock() {
-                    es.pmem = None;
-                    let target_name = connection::target_name(state_ref.connection_mode);
-                    status_label_clone.set_label("Not connected");
-                    status_label_clone.remove_css_class("success");
-                    status_label_clone.add_css_class("error");
-                    connect_btn_clone.set_label(&format!("Connect to {}", target_name));
-                    connect_btn_clone.remove_css_class("destructive-action");
-                    connect_btn_clone.add_css_class("suggested-action");
-                }
-            }
+        if should_reset
+            && let Ok(state_ref) = state_clone.try_borrow()
+            && let Ok(mut es) = state_ref.engine_state.try_lock()
+        {
+            es.pmem = None;
+            let target_name = connection::target_name(state_ref.connection_mode);
+            status_label_clone.set_label("Not connected");
+            status_label_clone.remove_css_class("success");
+            status_label_clone.add_css_class("error");
+            connect_btn_clone.set_label(&format!("Connect to {}", target_name));
+            connect_btn_clone.remove_css_class("destructive-action");
+            connect_btn_clone.add_css_class("suggested-action");
         }
         glib::ControlFlow::Continue
     });
@@ -422,31 +421,31 @@ pub(crate) fn build_ui(app: &adw::Application) {
     let check_updates_enabled = state.borrow().check_for_updates;
     if check_updates_enabled {
         std::thread::spawn(move || {
-            if let Some(status) = crate::logic::update::check_for_updates() {
-                if status.update_available {
-                    glib::idle_add(move || {
-                        let dialog = adw::AlertDialog::builder()
-                            .heading("Update Available")
-                            .body(format!(
-                                "SquidMod {} is available (running {})",
-                                status.latest_tag, status.current_version
-                            ))
-                            .build();
-                        dialog.add_response("cancel", "Not now");
-                        dialog.add_response("update", "Update");
-                        dialog.set_response_appearance("update", adw::ResponseAppearance::Suggested);
-                        dialog.connect_response(None, move |_, response| {
-                            if response == "update" {
-                                let _ = gtk::gio::AppInfo::launch_default_for_uri(
-                                    "https://github.com/JerrySM64/SquidMod/releases",
-                                    None::<&gio::AppLaunchContext>,
-                                );
-                            }
-                        });
-                        dialog.present(None::<&gtk::Window>);
-                        glib::ControlFlow::Break
+            if let Some(status) = crate::logic::update::check_for_updates()
+                && status.update_available
+            {
+                glib::idle_add(move || {
+                    let dialog = adw::AlertDialog::builder()
+                        .heading("Update Available")
+                        .body(format!(
+                            "SquidMod {} is available (running {})",
+                            status.latest_tag, status.current_version
+                        ))
+                        .build();
+                    dialog.add_response("cancel", "Not now");
+                    dialog.add_response("update", "Update");
+                    dialog.set_response_appearance("update", adw::ResponseAppearance::Suggested);
+                    dialog.connect_response(None, move |_, response| {
+                        if response == "update" {
+                            let _ = gtk::gio::AppInfo::launch_default_for_uri(
+                                "https://github.com/JerrySM64/SquidMod/releases",
+                                None::<&gio::AppLaunchContext>,
+                            );
+                        }
                     });
-                }
+                    dialog.present(None::<&gtk::Window>);
+                    glib::ControlFlow::Break
+                });
             }
         });
     }

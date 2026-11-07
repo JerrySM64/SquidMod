@@ -8,9 +8,9 @@ use wasmtime::{Engine, Instance, Linker, Module, Store};
 
 #[derive(Debug, Clone)]
 pub enum PluginEvent {
-    ToggleChanged(u32, bool),
-    TextChanged(u32, String),
-    DropdownChanged(u32, u64),
+    Toggle(u32, bool),
+    Text(u32, String),
+    Dropdown(u32, u64),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -89,13 +89,12 @@ pub fn load_plugin(
     };
 
     for payload in wasmparser::Parser::new(0).parse_all(&bytes) {
-        if let Ok(wasmparser::Payload::CustomSection(section)) = payload {
-            if section.name() == "plugin_metadata" {
-                if let Ok(m) = serde_json::from_slice::<PluginMetadata>(section.data()) {
-                    metadata = m;
-                    break;
-                }
-            }
+        if let Ok(wasmparser::Payload::CustomSection(section)) = payload
+            && section.name() == "plugin_metadata"
+            && let Ok(m) = serde_json::from_slice::<PluginMetadata>(section.data())
+        {
+            metadata = m;
+            break;
         }
     }
 
@@ -127,13 +126,13 @@ impl WasmPlugin {
         if let Some(f) = on_event {
             while let Ok(event) = self.event_receiver.try_recv() {
                 match event {
-                    PluginEvent::ToggleChanged(handle, val) => {
+                    PluginEvent::Toggle(handle, val) => {
                         let _ = f.call(&mut self.store, (handle, val as u64));
                     }
-                    PluginEvent::DropdownChanged(handle, val) => {
+                    PluginEvent::Dropdown(handle, val) => {
                         let _ = f.call(&mut self.store, (handle, val));
                     }
-                    PluginEvent::TextChanged(handle, text) => {
+                    PluginEvent::Text(handle, text) => {
                         self.write_scratch(&text);
                         let _ = f.call(&mut self.store, (handle, 0));
                     }

@@ -260,7 +260,7 @@ pub fn create_memory_viewer_page(state: &Rc<RefCell<AppState>>) -> adw::Preferen
         };
         
         if let Some(pm) = pm_opt {
-            let clean = input.replace('[', "").replace(']', "");
+            let clean = input.replace(['[', ']'], "");
             let parts: Vec<&str> = clean.split('+').map(|s| s.trim()).collect();
             
             if parts.is_empty() || parts[0].is_empty() {

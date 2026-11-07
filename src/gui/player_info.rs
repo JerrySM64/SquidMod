@@ -231,11 +231,7 @@ pub fn create_player_info_page(state: &Rc<RefCell<AppState>>) -> adw::Preference
         let fetch_res = {
             let es = state_ref.engine_state.lock().unwrap();
             let network_mode = state_ref.network_mode;
-            if let Some(ref pm) = es.pmem {
-                Some(fetch_all_players(pm, network_mode))
-            } else {
-                None
-            }
+            es.pmem.as_ref().map(|pm| fetch_all_players(pm, network_mode))
         };
         if let Some(res) = fetch_res {
             match res {

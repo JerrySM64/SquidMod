@@ -214,10 +214,10 @@ fn extract_field_name_from_part(part: &str) -> Option<String> {
 fn extract_field_value_from_part(part: &str) -> Option<String> {
     let (value_start, offset) = match part.find("\r\n\r\n") {
         Some(pos) => (pos, 4),
-        None => match part.find("\n\n") {
-            Some(pos) => (pos, 2),
-            None => return None,
-        },
+        None => {
+            let pos = part.find("\n\n")?;
+            (pos, 2)
+        }
     };
 
     let value = &part[value_start + offset..];
@@ -251,10 +251,7 @@ fn build_multipart_body(
 
     body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
     body.extend_from_slice(
-        format!(
-            "Content-Disposition: form-data; name=\"FaceImg\"; filename=\"face.bin\"\r\n"
-        )
-        .as_bytes(),
+        b"Content-Disposition: form-data; name=\"FaceImg\"; filename=\"face.bin\"\r\n",
     );
     body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
     body.extend_from_slice(faceimg);

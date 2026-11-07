@@ -997,6 +997,7 @@ fn rel_branch_offset(w: u32) -> Option<i32> {
 }
 
 pub fn gecko_to_asm(gecko_text: &str) -> Result<String, String> {
+    type AddrValPairs = Vec<(u32, u32)>;
     let mut pairs: Vec<(u32, u32)> = Vec::new();
     for line in gecko_text.lines() {
         let trimmed = line.trim();
@@ -1019,17 +1020,17 @@ pub fn gecko_to_asm(gecko_text: &str) -> Result<String, String> {
 
     pairs.sort_by_key(|&(addr, _)| addr);
 
-    let (cave_pairs, standard_pairs): (Vec<(u32, u32)>, Vec<(u32, u32)>) = pairs
+    let (cave_pairs, standard_pairs): (AddrValPairs, AddrValPairs) = pairs
         .into_iter()
         .partition(|&(addr, _)| (0x02DF0000..=0x02DFFFFF).contains(&addr));
 
     let mut blocks: Vec<Vec<(u32, u32)>> = Vec::new();
     for &(addr, val) in &cave_pairs {
-        if let Some(last) = blocks.last_mut() {
-            if last.last().map_or(false, |&(prev, _)| prev.wrapping_add(4) == addr) {
-                last.push((addr, val));
-                continue;
-            }
+        if let Some(last) = blocks.last_mut()
+            && last.last().is_some_and(|&(prev, _)| prev.wrapping_add(4) == addr)
+        {
+            last.push((addr, val));
+            continue;
         }
         blocks.push(vec![(addr, val)]);
     }
