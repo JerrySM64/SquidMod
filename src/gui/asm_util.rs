@@ -3,7 +3,7 @@ use gtk4 as gtk;
 use gtk4::prelude::*;
 use libadwaita as adw;
 
-use crate::logic::asmutil;
+use crate::logic::asmutil::{self, PortOptions};
 
 pub fn show_assembler_window(parent: Option<&gtk::Window>) {
     let window = adw::Window::builder()
@@ -80,6 +80,16 @@ pub fn show_assembler_window(parent: Option<&gtk::Window>) {
 
     content.append(&columns_box);
 
+    let warnings_label = gtk::Label::builder()
+        .halign(gtk::Align::Start)
+        .xalign(0.0)
+        .wrap(true)
+        .selectable(true)
+        .visible(false)
+        .build();
+    warnings_label.add_css_class("warning");
+    content.append(&warnings_label);
+
     let bottom_box = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     bottom_box.set_margin_top(8);
 
@@ -111,7 +121,9 @@ pub fn show_assembler_window(parent: Option<&gtk::Window>) {
     let output_label_clone = output_label.clone();
     let input_v_swap = input_view.clone();
     let output_v_swap = output_view.clone();
+    let warnings_swap = warnings_label.clone();
     mode_dropdown.connect_selected_item_notify(move |dd| {
+        warnings_swap.set_visible(false);
         if dd.selected() == 0 {
             input_label_clone.set_label("Gecko");
             output_label_clone.set_label("ASM");
@@ -136,22 +148,22 @@ pub fn show_assembler_window(parent: Option<&gtk::Window>) {
             .text(&buffer.start_iter(), &buffer.end_iter(), false)
             .to_string();
 
+        let opts = PortOptions::default();
         let result = if mode_dd.selected() == 0 {
-            let cemu_gecko = asmutil::gecko_convert_addresses(&text, true);
-            asmutil::gecko_to_asm(&cemu_gecko)
+            asmutil::console_to_cemu(&text, &opts)
         } else {
-            match asmutil::cemu_asm_to_gecko(&text, 0) {
-                Ok(gecko) => Ok(asmutil::gecko_convert_addresses(&gecko, false)),
-                Err(e) => Err(e),
-            }
+            asmutil::cemu_to_console(&text, opts.cave.start, &opts)
         };
 
         match result {
-            Ok(output) => {
-                output_v.buffer().set_text(&output);
+            Ok(ported) => {
+                output_v.buffer().set_text(&ported.text);
+                warnings_label.set_label(&ported.warnings.join("\n"));
+                warnings_label.set_visible(!ported.warnings.is_empty());
             }
             Err(e) => {
                 output_v.buffer().set_text(&format!("Error: {}", e));
+                warnings_label.set_visible(false);
             }
         }
     });
